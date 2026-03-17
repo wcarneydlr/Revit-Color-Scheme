@@ -1,0 +1,93 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>ColorSchemeAddin</AssemblyName>
+    <RootNamespace>ColorSchemeAddin</RootNamespace>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <LangVersion>10.0</LangVersion>
+    <PlatformTarget>x64</PlatformTarget>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+  <!--
+    Revit 2024 API references.
+    The repo lives at D:\Git\ColorSchemeAddin but Revit itself always installs to
+    C:\Program Files\Autodesk\Revit 2024\ — so these HintPaths stay on C:.
+    Only change them if you have a non-standard Revit install location.
+  -->
+  <ItemGroup>
+    <Reference Include="RevitAPI">
+      <HintPath>C:\Program Files\Autodesk\Revit 2024\RevitAPI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="RevitAPIUI">
+      <HintPath>C:\Program Files\Autodesk\Revit 2024\RevitAPIUI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- NuGet packages -->
+  <ItemGroup>
+    <PackageReference Include="ClosedXML" Version="0.102.2" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+  </ItemGroup>
+
+  <!-- Mark XAML files so they compile correctly -->
+  <ItemGroup>
+    <Page Include="App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Resources\DLRStyles.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\MainDashboardWindow.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\CreateSchemeView.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\ManageSchemeView.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\ApplySchemeView.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="Views\SchemeEditorDialog.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+  </ItemGroup>
+
+  <!--
+    Post-build: copy the addin manifest next to the DLL.
+    Post-build: also deploy everything to the Revit Addins folder on C:
+    (deployment target is always C: regardless of where the repo lives on D:)
+  -->
+  <Target Name="CopyAddinManifest" AfterTargets="Build">
+    <Copy SourceFiles="ColorSchemeAddin.addin" DestinationFolder="$(OutDir)" />
+  </Target>
+
+  <!--
+    Optional auto-deploy target. Uncomment to automatically push build output
+    to the Revit Addins folder every time you build in Debug configuration.
+
+  <Target Name="DeployToRevit" AfterTargets="Build" Condition="'$(Configuration)'=='Debug'">
+    <ItemGroup>
+      <DeployFiles Include="$(OutDir)**\*.*"/>
+    </ItemGroup>
+    <Copy SourceFiles="@(DeployFiles)"
+          DestinationFolder="$(APPDATA)\Autodesk\Revit\Addins\2024\%(RecursiveDir)" />
+    <Message Text="Deployed to Revit Addins folder." Importance="high" />
+  </Target>
+  -->
+
+</Project>

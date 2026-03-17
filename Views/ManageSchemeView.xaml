@@ -1,0 +1,154 @@
+<UserControl x:Class="ColorSchemeAddin.Views.ManageSchemeView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             Background="#FF283342">
+
+    <UserControl.Resources>
+        <ResourceDictionary Source="../Resources/DLRStyles.xaml"/>
+    </UserControl.Resources>
+
+    <Grid Margin="36,24,36,24">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- toolbar -->
+            <RowDefinition Height="*"/>    <!-- grid -->
+            <RowDefinition Height="Auto"/> <!-- export bar -->
+        </Grid.RowDefinitions>
+
+        <!-- ── Toolbar ─────────────────────────────────────────────── -->
+        <Grid Grid.Row="0" Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0" Text="Color Schemes" Style="{StaticResource H2}"
+                       VerticalAlignment="Center"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <Button Content="⟳  Refresh"
+                        Style="{StaticResource SecondaryButton}"
+                        Command="{Binding RefreshSchemesCommand}"/>
+                <Button Content="Export selected"
+                        Style="{StaticResource SecondaryButton}"
+                        Command="{Binding ExportSelectedCommand}"/>
+                <Button Content="Export all"
+                        Style="{StaticResource SecondaryButton}"
+                        Command="{Binding ExportAllCommand}"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ── Scheme grid ─────────────────────────────────────────── -->
+        <Border Grid.Row="1" CornerRadius="8" ClipToBounds="True">
+            <DataGrid Style="{StaticResource DLRDataGrid}"
+                      ItemsSource="{Binding SchemeRows}"
+                      SelectedItem="{Binding SelectedRow}"
+                      ColumnHeaderStyle="{StaticResource DLRDataGridColumnHeader}">
+
+                <DataGrid.Columns>
+                    <!-- Checkbox select -->
+                    <DataGridTemplateColumn Width="40" CanUserResize="False">
+                        <DataGridTemplateColumn.Header>
+                            <CheckBox VerticalAlignment="Center"
+                                      Foreground="White"
+                                      Command="{Binding DataContext.SelectAllCommand,
+                                                RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                      CommandParameter="{Binding IsChecked, RelativeSource={RelativeSource Self}}"/>
+                        </DataGridTemplateColumn.Header>
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                                          Style="{StaticResource DLRCheckBox}"
+                                          HorizontalAlignment="Center"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Name — clickable to open editor -->
+                    <DataGridTemplateColumn Header="Scheme Name" Width="*" MinWidth="160">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource IconButton}"
+                                        Background="Transparent" BorderThickness="0"
+                                        Foreground="{StaticResource CTARedBrush}"
+                                        HorizontalAlignment="Left"
+                                        Content="{Binding Name}"
+                                        Command="{Binding DataContext.EditSchemeCommand,
+                                                  RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        CommandParameter="{Binding}">
+                                    <Button.Template>
+                                        <ControlTemplate TargetType="Button">
+                                            <TextBlock Text="{TemplateBinding Content}"
+                                                       FontFamily="{StaticResource BodyFont}"
+                                                       FontSize="14" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource CTARedBrush}"
+                                                       TextDecorations="Underline"
+                                                       Cursor="Hand"/>
+                                        </ControlTemplate>
+                                    </Button.Template>
+                                </Button>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Category -->
+                    <DataGridTextColumn Header="Category" Width="120"
+                                        Binding="{Binding CategoryName}"
+                                        ElementStyle="{StaticResource H4}"/>
+
+                    <!-- Entry count -->
+                    <DataGridTextColumn Header="Entries" Width="80"
+                                        Binding="{Binding EntryCount}"
+                                        ElementStyle="{StaticResource H4}"/>
+
+                    <!-- Color preview bar -->
+                    <DataGridTemplateColumn Header="Colors" Width="200">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <ItemsControl ItemsSource="{Binding Model.Entries}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Width="14" Height="14" CornerRadius="2" Margin="1,0"
+                                                    Background="{Binding PreviewBrush}"
+                                                    ToolTip="{Binding Value}"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+
+                    <!-- Edit action -->
+                    <DataGridTemplateColumn Header="" Width="80">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <Button Content="Edit"
+                                        Style="{StaticResource IconButton}"
+                                        Command="{Binding DataContext.EditSchemeCommand,
+                                                  RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        CommandParameter="{Binding}"/>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Border>
+
+        <!-- ── Empty state ─────────────────────────────────────────── -->
+        <!-- Shown when grid is empty -->
+        <Border Grid.Row="1" Background="{StaticResource SurfaceBrush}"
+                CornerRadius="8" Padding="24"
+                Visibility="{Binding SchemeRows.Count, Converter={x:Static ZeroToVisibleConverter}}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="No color schemes found in this document."
+                           Style="{StaticResource H3}" HorizontalAlignment="Center"/>
+                <TextBlock Text="Go to the Create tab to import or create a scheme."
+                           Style="{StaticResource MutedText}" HorizontalAlignment="Center"
+                           Margin="0,8,0,0"/>
+            </StackPanel>
+        </Border>
+
+    </Grid>
+</UserControl>

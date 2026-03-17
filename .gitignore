@@ -1,0 +1,42 @@
+# ── Build output ───────────────────────────────────────────────────────────────
+bin/
+obj/
+
+# ── Visual Studio ──────────────────────────────────────────────────────────────
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.rsuser
+
+# ── JetBrains Rider ───────────────────────────────────────────────────────────
+.idea/
+
+# ── NuGet ─────────────────────────────────────────────────────────────────────
+# Restore packages from NuGet on build — don't commit them
+packages/
+*.nupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ── Revit API DLLs ────────────────────────────────────────────────────────────
+# Never commit — everyone pulls from their local Revit install at C:\Program Files\...
+RevitAPI.dll
+RevitAPIUI.dll
+
+# ── Test Revit models ─────────────────────────────────────────────────────────
+# Uncomment if you add test .rvt files you don't want in the repo
+# *.rvt
+# *.rfa
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ── Logs / temp ───────────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.temp

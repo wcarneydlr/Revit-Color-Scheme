@@ -1,0 +1,112 @@
+<Window x:Class="ColorSchemeAddin.Views.SchemePickerDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Select Revit Color Scheme"
+        Width="520" Height="420"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResizeWithGrip"
+        Background="#FF1B222C"
+        ShowInTaskbar="False">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="../Resources/DLRStyles.xaml"/>
+                <ResourceDictionary Source="../Resources/ConverterResources.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="56"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="60"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Style="{StaticResource TitleBarPanel}">
+            <TextBlock Text="Select an existing Color Fill Scheme"
+                       Style="{StaticResource TitleBarText}"/>
+        </Border>
+
+        <!-- Scheme list -->
+        <Grid Grid.Row="1" Margin="24,16,24,16">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Style="{StaticResource MutedText}" Margin="0,0,0,12"
+                       Text="Choose a scheme from this document. Its entries and colors will be loaded into the Create tab for review before creating a new scheme."/>
+
+            <Border Grid.Row="1" CornerRadius="6" ClipToBounds="True">
+                <ListBox x:Name="SchemeList"
+                         Background="{StaticResource SurfaceBrush}"
+                         BorderThickness="0"
+                         Foreground="{StaticResource TextPrimaryBrush}"
+                         FontFamily="{StaticResource BodyFont}"
+                         FontSize="14"
+                         SelectionMode="Single">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="8,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                           Style="{StaticResource H4Bold}"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Style="{StaticResource MutedText}"
+                                           VerticalAlignment="Center"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="4,2"/>
+                            <Setter Property="Cursor" Value="Hand"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background"
+                                            Value="{StaticResource SelectionBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background"
+                                            Value="{StaticResource ElevatedBrush}"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
+            </Border>
+
+            <!-- Empty state -->
+            <TextBlock Grid.Row="2" Margin="0,12,0,0"
+                       Style="{StaticResource MutedText}"
+                       Text="No Color Fill Schemes found in this document."
+                       Visibility="{Binding ElementName=SchemeList,
+                                    Path=Items.Count,
+                                    Converter={StaticResource ZeroToVisibleConverter}}"/>
+        </Grid>
+
+        <!-- Footer -->
+        <Border Grid.Row="2" Background="#FF1B222C"
+                BorderThickness="0,1,0,0" BorderBrush="#22FFFFFF"
+                Padding="24,0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
+                        VerticalAlignment="Center" Spacing="8">
+                <Button Content="Cancel"
+                        Style="{StaticResource SecondaryButton}"
+                        IsCancel="True" Click="Cancel_Click"/>
+                <Button Content="Select"
+                        Style="{StaticResource PrimaryButton}"
+                        MinWidth="100"
+                        IsDefault="True"
+                        Click="Select_Click"/>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
