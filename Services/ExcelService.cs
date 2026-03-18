@@ -191,7 +191,7 @@ namespace ColorSchemeAddin.Services
             var invalid = new[] { '/', '\\', '?', '*', '[', ']', ':' };
             foreach (char c in invalid)
                 name = name.Replace(c, '_');
-            return name.Length > 31 ? name[..31] : name;
+            return name.Length > 31 ? name.Substring(0, 31) : name;
         }
     }
 }

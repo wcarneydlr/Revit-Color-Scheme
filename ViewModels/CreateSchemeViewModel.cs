@@ -8,6 +8,7 @@ using System;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Windows.Threading;
 using System.Windows;
 
 namespace ColorSchemeAddin.ViewModels
@@ -30,6 +31,10 @@ namespace ColorSchemeAddin.ViewModels
         [ObservableProperty] private string _importFilePath = string.Empty;
         [ObservableProperty] private string _lastResult = string.Empty;
 
+        // ── Scratch entry for "create from scratch" ────────────────────────
+        [ObservableProperty] private ColorSchemeModel _scratchScheme = new();
+        [ObservableProperty] private string _scratchSchemeName = string.Empty;
+
         public static string[] AvailableParameters => new[]
         {
             "Department", "Name", "Occupancy", "Space Type",
@@ -38,21 +43,27 @@ namespace ColorSchemeAddin.ViewModels
 
         public CreateSchemeViewModel(Document doc, MainDashboardViewModel main)
         {
-            _doc = doc;
+            _doc  = doc;
             _main = main;
-            LoadExistingRevitSchemes();
+            ResetScratchScheme();
+            // Defer Revit API read until after window is loaded
+            Dispatcher.CurrentDispatcher.BeginInvoke(
+                DispatcherPriority.Loaded,
+                new Action(() =>
+                {
+                    try { LoadExistingRevitSchemes(); } catch { }
+                }));
         }
 
-        // ── Commands ───────────────────────────────────────────────────────
+        // ── Excel import commands ──────────────────────────────────────────
 
         [RelayCommand]
         private void BrowseImportFile()
         {
             var dlg = new OpenFileDialog
             {
-                Title = "Select Color Scheme Excel File",
-                Filter = "Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*",
-                FilterIndex = 1
+                Title  = "Select Color Scheme Excel File",
+                Filter = "Excel Files (*.xlsx)|*.xlsx|All Files (*.*)|*.*"
             };
             if (dlg.ShowDialog() == true)
             {
@@ -66,8 +77,8 @@ namespace ColorSchemeAddin.ViewModels
         {
             var dlg = new SaveFileDialog
             {
-                Title = "Save Color Scheme Template",
-                Filter = "Excel Files (*.xlsx)|*.xlsx",
+                Title    = "Save Color Scheme Template",
+                Filter   = "Excel Files (*.xlsx)|*.xlsx",
                 FileName = "DLR_Color_Scheme_Template.xlsx"
             };
             if (dlg.ShowDialog() == true)
@@ -76,12 +87,11 @@ namespace ColorSchemeAddin.ViewModels
                 {
                     ExcelService.ExportTemplate(dlg.FileName);
                     LastResult = $"Template saved to {Path.GetFileName(dlg.FileName)}";
-                    _main.SetStatus($"Template downloaded: {dlg.FileName}");
+                    _main.SetStatus(LastResult);
                 }
                 catch (Exception ex)
                 {
-                    LastResult = $"Error: {ex.Message}";
-                    MessageBox.Show(ex.Message, "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    ShowError(ex);
                 }
             }
         }
@@ -91,29 +101,101 @@ namespace ColorSchemeAddin.ViewModels
         {
             if (SelectedImportedScheme == null)
             {
-                MessageBox.Show("Please import an Excel file and select a scheme.", "No Scheme Selected",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Please import an Excel file and select a scheme.",
+                    "No Scheme Selected", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            TryCreateOrUpdate(SelectedImportedScheme);
+        }
+
+        // ── From scratch commands ──────────────────────────────────────────
+
+        [RelayCommand]
+        private void AddScratchEntry()
+        {
+            ScratchScheme.Entries.Add(new ColorEntryModel
+            {
+                Value = "New Entry", ColorName = "New Entry",
+                R = 128, G = 128, B = 128
+            });
+        }
+
+        [RelayCommand]
+        private void RemoveScratchEntry(ColorEntryModel? entry)
+        {
+            if (entry != null)
+                ScratchScheme.Entries.Remove(entry);
+        }
+
+        [RelayCommand]
+        private void CreateFromScratch()
+        {
+            if (string.IsNullOrWhiteSpace(ScratchSchemeName))
+            {
+                MessageBox.Show("Please enter a name for the scheme.",
+                    "Name Required", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            if (ScratchScheme.Entries.Count == 0)
+            {
+                MessageBox.Show("Please add at least one color entry.",
+                    "No Entries", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
+            ScratchScheme.Name = ScratchSchemeName;
+            ScratchScheme.ParameterName = ParameterName;
+            ScratchScheme.ApplyToRooms = TargetRooms;
+            ScratchScheme.ApplyToAreas = TargetAreas;
+
+            TryCreateOrUpdate(ScratchScheme);
+            ResetScratchScheme();
+        }
+
+        // ── From existing Revit scheme command ─────────────────────────────
+
+        [RelayCommand]
+        private void ImportFromRevitScheme()
+        {
+            if (SelectedRevitScheme == null)
+            {
+                MessageBox.Show("Please select an existing Revit color scheme.",
+                    "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            var service = new ColorFillSchemeService(_doc);
+            var model = service.ToModel(SelectedRevitScheme);
+            model.ApplyToRooms   = TargetRooms;
+            model.ApplyToAreas   = TargetAreas;
+            model.ParameterName  = ParameterName;
+
+            ImportedSchemes.Add(model);
+            SelectedImportedScheme = model;
+            LastResult = $"Loaded '{model.Name}' from Revit ({model.Entries.Count} entries). " +
+                         "Review then click Create Scheme.";
+            _main.SetStatus(LastResult);
+        }
+
+        // ── Shared create/update ───────────────────────────────────────────
+
+        private void TryCreateOrUpdate(ColorSchemeModel model)
+        {
             try
             {
-                _main.SetStatus($"Creating scheme: {SelectedImportedScheme.Name}…", true);
-
+                _main.SetStatus($"Creating scheme: {model.Name}…", true);
                 var service = new ColorFillSchemeService(_doc);
 
-                // Check for duplicate
-                if (service.FindByName(SelectedImportedScheme.Name) != null)
+                var existing = service.FindByName(model.Name);
+                if (existing != null)
                 {
                     var result = MessageBox.Show(
-                        $"A scheme named '{SelectedImportedScheme.Name}' already exists.\nUpdate it with the imported colors?",
+                        $"A scheme named '{model.Name}' already exists.\nUpdate it with these colors?",
                         "Scheme Exists", MessageBoxButton.YesNo, MessageBoxImage.Question);
-
                     if (result == MessageBoxResult.Yes)
                     {
-                        var existing = service.FindByName(SelectedImportedScheme.Name)!;
-                        service.UpdateScheme(existing, SelectedImportedScheme);
-                        LastResult = $"Updated scheme '{SelectedImportedScheme.Name}' with {SelectedImportedScheme.Entries.Count} entries.";
+                        service.UpdateScheme(existing, model);
+                        LastResult = $"Updated '{model.Name}' with {model.Entries.Count} entries.";
                     }
                     else return;
                 }
@@ -122,43 +204,14 @@ namespace ColorSchemeAddin.ViewModels
                     var catId = TargetAreas
                         ? new ElementId(BuiltInCategory.OST_Areas)
                         : new ElementId(BuiltInCategory.OST_Rooms);
-
-                    service.CreateScheme(SelectedImportedScheme, catId);
-                    LastResult = $"Created scheme '{SelectedImportedScheme.Name}' with {SelectedImportedScheme.Entries.Count} entries.";
+                    service.CreateScheme(model, catId);
+                    LastResult = $"Created '{model.Name}' with {model.Entries.Count} entries.";
                 }
 
                 _main.SetStatus(LastResult);
                 _main.NavigateToManage();
             }
-            catch (Exception ex)
-            {
-                LastResult = $"Error: {ex.Message}";
-                _main.SetStatus($"Error creating scheme");
-                MessageBox.Show(ex.Message, "Create Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-        }
-
-        [RelayCommand]
-        private void ImportFromRevitScheme()
-        {
-            if (SelectedRevitScheme == null)
-            {
-                MessageBox.Show("Please select an existing Revit color scheme.", "No Selection",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            var service = new ColorFillSchemeService(_doc);
-            var model = service.ToModel(SelectedRevitScheme);
-            model.ApplyToRooms = TargetRooms;
-            model.ApplyToAreas = TargetAreas;
-            model.ParameterName = ParameterName;
-
-            // Add to imported list so user can review before creating
-            ImportedSchemes.Add(model);
-            SelectedImportedScheme = model;
-            LastResult = $"Loaded '{model.Name}' from Revit ({model.Entries.Count} entries). Review and click 'Create Scheme'.";
-            _main.SetStatus(LastResult);
+            catch (Exception ex) { ShowError(ex); }
         }
 
         // ── Helpers ────────────────────────────────────────────────────────
@@ -175,12 +228,7 @@ namespace ColorSchemeAddin.ViewModels
                 LastResult = $"Loaded {schemes.Count} scheme(s) from {Path.GetFileName(path)}.";
                 _main.SetStatus(LastResult);
             }
-            catch (Exception ex)
-            {
-                LastResult = $"Import error: {ex.Message}";
-                _main.SetStatus("Import failed");
-                MessageBox.Show(ex.Message, "Import Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
+            catch (Exception ex) { ShowError(ex); }
         }
 
         private void LoadExistingRevitSchemes()
@@ -192,7 +240,20 @@ namespace ColorSchemeAddin.ViewModels
                 foreach (var s in service.GetAllSchemes())
                     ExistingRevitSchemes.Add(s);
             }
-            catch { /* not fatal if none exist */ }
+            catch { }
+        }
+
+        private void ResetScratchScheme()
+        {
+            ScratchScheme = new ColorSchemeModel();
+            ScratchSchemeName = string.Empty;
+        }
+
+        private void ShowError(Exception ex)
+        {
+            LastResult = $"Error: {ex.Message}";
+            _main.SetStatus("Operation failed");
+            MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 }

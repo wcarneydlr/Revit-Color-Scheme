@@ -24,7 +24,7 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <TextBlock Text="Edit: " Style="{StaticResource TitleBarText}"
                            Foreground="{StaticResource TextSecondaryBrush}"/>
-                <TextBlock Text="{Binding Name}" Style="{StaticResource TitleBarText}"/>
+                <TextBlock Text="{Binding Model.Name}" Style="{StaticResource TitleBarText}"/>
             </StackPanel>
         </Border>
 
@@ -122,8 +122,8 @@
             </ScrollViewer>
 
             <!-- Add / remove row buttons -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0" Spacing="8">
-                <Button Content="+ Add entry"
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
+                <Button Content="+ Add entry" Margin="0,0,8,0"
                         Style="{StaticResource SecondaryButton}"
                         Click="AddEntry_Click"/>
                 <Button Content="Remove selected"
@@ -137,8 +137,8 @@
                 BorderThickness="0,1,0,0" BorderBrush="#22FFFFFF"
                 Padding="24,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
-                        VerticalAlignment="Center" Spacing="8">
-                <Button Content="Cancel"
+                        VerticalAlignment="Center">
+                <Button Content="Cancel" Margin="0,0,8,0"
                         Style="{StaticResource SecondaryButton}"
                         IsCancel="True"
                         Click="Cancel_Click"/>

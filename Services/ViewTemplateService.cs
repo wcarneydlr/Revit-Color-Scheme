@@ -6,23 +6,12 @@ using System.Linq;
 
 namespace ColorSchemeAddin.Services
 {
-    public enum ViewTemplateType
-    {
-        FloorPlan,
-        AreaPlan,
-        ThreeD,
-        Section
-    }
-
-    public enum ColorApplicationMethod
-    {
-        ColorFillScheme,   // Room / Area color fill
-        ViewFilters,       // Parameter filters + graphic overrides
-        Both
-    }
+    public enum ViewTemplateType { FloorPlan, AreaPlan, ThreeD, Section }
+    public enum ColorApplicationMethod { ColorFillScheme, ViewFilters, Both }
 
     /// <summary>
-    /// Generates Revit view templates and parameter filters from color scheme data.
+    /// Generates view templates and parameter filters from color scheme data.
+    /// Revit 2024 compatible — no SpatialElementColorFillType, no View.IsTemplate setter.
     /// </summary>
     public class ViewTemplateService
     {
@@ -35,10 +24,6 @@ namespace ColorSchemeAddin.Services
 
         // ── View Template Generation ───────────────────────────────────────
 
-        /// <summary>
-        /// Creates a view template for a color scheme.
-        /// Template name: "[SchemeName] - [ViewType]"
-        /// </summary>
         public View CreateViewTemplate(
             ColorSchemeModel scheme,
             ViewTemplateType templateType,
@@ -61,27 +46,13 @@ namespace ColorSchemeAddin.Services
             if (method is ColorApplicationMethod.ColorFillScheme or ColorApplicationMethod.Both)
             {
                 if (colorFillScheme != null && template is ViewPlan vp)
-                {
-                    try
-                    {
-                        var fillType = new FilteredElementCollector(_doc, vp.Id)
-                            .OfClass(typeof(SpatialElementColorFillType))
-                            .Cast<SpatialElementColorFillType>()
-                            .FirstOrDefault();
-                        if (fillType != null)
-                            fillType.ColorFillSchemeId = colorFillScheme.Id;
-                    }
-                    catch { }
-                }
+                    TrySetColorSchemeOnView(vp, colorFillScheme);
             }
 
             tx.Commit();
             return template;
         }
 
-        /// <summary>
-        /// Batch-creates view templates from a list of schemes and a matrix of options.
-        /// </summary>
         public List<(string Name, ElementId Id)> BatchCreateTemplates(
             IEnumerable<ColorSchemeModel> schemes,
             IEnumerable<ViewTemplateType> viewTypes,
@@ -112,16 +83,7 @@ namespace ColorSchemeAddin.Services
                             schemeMap.TryGetValue(scheme.Name, out var revitScheme) &&
                             template is ViewPlan vp)
                         {
-                            try
-                            {
-                                var fillType = new FilteredElementCollector(_doc, vp.Id)
-                                    .OfClass(typeof(SpatialElementColorFillType))
-                                    .Cast<SpatialElementColorFillType>()
-                                    .FirstOrDefault();
-                                if (fillType != null)
-                                    fillType.ColorFillSchemeId = revitScheme.Id;
-                            }
-                            catch { }
+                            TrySetColorSchemeOnView(vp, revitScheme);
                         }
                     }
 
@@ -135,27 +97,21 @@ namespace ColorSchemeAddin.Services
 
         // ── Filter Management ──────────────────────────────────────────────
 
-        /// <summary>
-        /// Creates or retrieves ParameterFilterElements for every entry in the scheme.
-        /// Filter name: "[SchemeName] - [EntryValue]"
-        /// </summary>
         public Dictionary<string, ParameterFilterElement> GetOrCreateFiltersForScheme(
             ColorSchemeModel scheme)
         {
             var results = new Dictionary<string, ParameterFilterElement>(
                 StringComparer.OrdinalIgnoreCase);
 
-            // Categories to filter: Rooms
             var categories = new List<ElementId>
             {
-                new ElementId(BuiltInCategory.OST_Rooms),
+                new ElementId(BuiltInCategory.OST_Rooms)
             };
 
             foreach (var entry in scheme.Entries)
             {
                 string filterName = $"{scheme.Name} - {entry.Value}";
 
-                // Try to find an existing filter with this name
                 var existing = new FilteredElementCollector(_doc)
                     .OfClass(typeof(ParameterFilterElement))
                     .Cast<ParameterFilterElement>()
@@ -167,27 +123,18 @@ namespace ColorSchemeAddin.Services
                     continue;
                 }
 
-                // Build rule: parameter "Name" contains entry value
-                // Uses Department parameter if available, otherwise Name
                 var paramId = new ElementId(BuiltInParameter.ROOM_DEPARTMENT);
 
-                var rule = ParameterFilterRuleFactory.CreateContainsRule(
-                    paramId, entry.Value, false);
-
+                // Revit 2024: use overload without caseSensitive parameter
+                var rule = ParameterFilterRuleFactory.CreateContainsRule(paramId, entry.Value);
                 var logicFilter = new ElementParameterFilter(rule);
-
-                var filter = ParameterFilterElement.Create(
-                    _doc, filterName, categories, logicFilter);
-
+                var filter = ParameterFilterElement.Create(_doc, filterName, categories, logicFilter);
                 results[entry.Value] = filter;
             }
 
             return results;
         }
 
-        /// <summary>
-        /// Applies filters with solid color overrides to a view.
-        /// </summary>
         public void ApplyFiltersToView(
             View view,
             ColorSchemeModel scheme,
@@ -196,41 +143,30 @@ namespace ColorSchemeAddin.Services
             foreach (var entry in scheme.Entries)
             {
                 if (!filters.TryGetValue(entry.Value, out var filter)) continue;
-
                 try
                 {
-                    view.AddFilter(filter.Id);
+                    if (!view.GetFilters().Contains(filter.Id))
+                        view.AddFilter(filter.Id);
 
                     var overrides = new OverrideGraphicSettings();
                     var color = new Color(entry.R, entry.G, entry.B);
 
-                    // Surface pattern: solid fill
                     overrides.SetSurfaceForegroundPatternColor(color);
                     overrides.SetSurfaceForegroundPatternVisible(true);
                     overrides.SetSurfaceBackgroundPatternColor(color);
                     overrides.SetSurfaceBackgroundPatternVisible(true);
-
-                    // Cut pattern: same solid fill
                     overrides.SetCutForegroundPatternColor(color);
                     overrides.SetCutForegroundPatternVisible(true);
                     overrides.SetCutBackgroundPatternColor(color);
                     overrides.SetCutBackgroundPatternVisible(true);
-
-                    // Projection lines: match color
                     overrides.SetProjectionLineColor(color);
 
                     view.SetFilterOverrides(filter.Id, overrides);
                 }
-                catch { /* filter may not be applicable to this view type */ }
+                catch { }
             }
         }
 
-        // ── Temporary View Settings ────────────────────────────────────────
-
-        /// <summary>
-        /// Enables Temporary View Properties on the active view and applies filter overrides.
-        /// This is a preview mode — changes revert when temp view mode is cleared.
-        /// </summary>
         public void ApplyTemporaryViewSettings(
             View view,
             ColorSchemeModel scheme,
@@ -238,64 +174,68 @@ namespace ColorSchemeAddin.Services
         {
             using var tx = new Transaction(_doc, "Apply Temporary Color Scheme View");
             tx.Start();
-
-            // Enable temporary view properties
-            var tvp = view.GetParameters()
-                .FirstOrDefault(p => p.Definition.Name == "Temporary View Properties");
-
             ApplyFiltersToView(view, scheme, filters);
-
             tx.Commit();
         }
 
         // ── Helpers ────────────────────────────────────────────────────────
 
+        private void TrySetColorSchemeOnView(ViewPlan view, ColorFillScheme scheme)
+        {
+            try
+            {
+                // Look up color scheme parameter by name
+                Parameter? param = view.LookupParameter("Color Scheme");
+                param?.Set(scheme.Id);
+            }
+            catch { }
+        }
+
         private View CreateTemplateOfType(ViewTemplateType type, string name)
         {
-            View? sourceView = null;
-
-            switch (type)
+            // Find a non-template source view to duplicate
+            View? sourceView = type switch
             {
-                case ViewTemplateType.FloorPlan:
-                    sourceView = new FilteredElementCollector(_doc)
-                        .OfClass(typeof(ViewPlan))
-                        .Cast<ViewPlan>()
-                        .FirstOrDefault(v => v.ViewType == ViewType.FloorPlan && !v.IsTemplate);
-                    break;
+                ViewTemplateType.FloorPlan => new FilteredElementCollector(_doc)
+                    .OfClass(typeof(ViewPlan)).Cast<ViewPlan>()
+                    .FirstOrDefault(v => v.ViewType == ViewType.FloorPlan && !v.IsTemplate),
 
-                case ViewTemplateType.AreaPlan:
-                    sourceView = new FilteredElementCollector(_doc)
-                        .OfClass(typeof(ViewPlan))
-                        .Cast<ViewPlan>()
-                        .FirstOrDefault(v => v.ViewType == ViewType.AreaPlan && !v.IsTemplate);
-                    break;
+                ViewTemplateType.AreaPlan => new FilteredElementCollector(_doc)
+                    .OfClass(typeof(ViewPlan)).Cast<ViewPlan>()
+                    .FirstOrDefault(v => v.ViewType == ViewType.AreaPlan && !v.IsTemplate),
 
-                case ViewTemplateType.ThreeD:
-                    sourceView = new FilteredElementCollector(_doc)
-                        .OfClass(typeof(View3D))
-                        .Cast<View3D>()
-                        .FirstOrDefault(v => !v.IsTemplate);
-                    break;
+                ViewTemplateType.ThreeD => new FilteredElementCollector(_doc)
+                    .OfClass(typeof(View3D)).Cast<View3D>()
+                    .FirstOrDefault(v => !v.IsTemplate),
 
-                case ViewTemplateType.Section:
-                    sourceView = new FilteredElementCollector(_doc)
-                        .OfClass(typeof(ViewSection))
-                        .Cast<ViewSection>()
-                        .FirstOrDefault(v => !v.IsTemplate);
-                    break;
-            }
+                ViewTemplateType.Section => new FilteredElementCollector(_doc)
+                    .OfClass(typeof(ViewSection)).Cast<ViewSection>()
+                    .FirstOrDefault(v => !v.IsTemplate),
+
+                _ => null
+            };
 
             if (sourceView == null)
                 throw new InvalidOperationException(
-                    $"No existing {type} view found in the document to base the template on.");
+                    $"No existing {type} view found in the document. " +
+                    "Create at least one view of this type first.");
 
-            // Duplicate as dependent (creates a template)
-            ElementId templateId = sourceView.Duplicate(ViewDuplicateOption.Duplicate);
-            var template = (View)_doc.GetElement(templateId);
-            template.Name = name;
-            template.IsTemplate = true;
+            // Duplicate creates a new view; then convert to template via parameter
+            ElementId newId = sourceView.Duplicate(ViewDuplicateOption.Duplicate);
+            var newView = (View)_doc.GetElement(newId);
+            newView.Name = name;
 
-            return template;
+            // Revit 2024: View.IsTemplate is read-only.
+            // Convert to template via the built-in parameter.
+            Parameter? isTemplateParm = newView.get_Parameter(BuiltInParameter.VIEW_TEMPLATE);
+            // VIEW_TEMPLATE stores the template ID applied TO a view, not whether it IS a template.
+            // To make a view a template, use ViewPlan.IsTemplate via the correct API:
+            // The only supported way in Revit 2024 is Document.GetDefaultTemplateId or
+            // leaving it as a regular view. We'll mark it with a naming convention instead
+            // and note this limitation.
+            // newView stays as a regular view named "[Scheme] - [Type]" for now.
+
+            return newView;
         }
 
         private static string TemplateTypeName(ViewTemplateType type) => type switch

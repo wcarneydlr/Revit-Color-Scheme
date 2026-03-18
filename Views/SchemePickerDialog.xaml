@@ -97,7 +97,7 @@
                 BorderThickness="0,1,0,0" BorderBrush="#22FFFFFF"
                 Padding="24,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right"
-                        VerticalAlignment="Center" Spacing="8">
+                        VerticalAlignment="Center">
                 <Button Content="Cancel"
                         Style="{StaticResource SecondaryButton}"
                         IsCancel="True" Click="Cancel_Click"/>

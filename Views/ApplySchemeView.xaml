@@ -2,180 +2,210 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="#FF283342">
-
     <UserControl.Resources>
         <ResourceDictionary Source="../Resources/DLRStyles.xaml"/>
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <Grid Margin="36,24,36,24">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="16"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
+    <Grid>
+        <!-- Step 1: Select method -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      Visibility="{Binding IsOnStep1,
+                          Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Margin="36,24,36,24" MaxWidth="640">
+                <TextBlock Text="How would you like to apply the scheme?"
+                           Style="{StaticResource H2}" Margin="0,0,0,4"/>
+                <TextBlock Style="{StaticResource MutedText}" Margin="0,0,0,24"
+                           Text="Choose one method then click Next to select the scheme and configure details."/>
 
-            <!-- ── Left column ───────────────────────────────────── -->
-            <StackPanel Grid.Column="0">
+                <Border Style="{StaticResource CardBorder}" Padding="0">
+                    <StackPanel>
+                        <RadioButton Style="{StaticResource MethodRadioStyle}"
+                                     Content="Create Materials"
+                                     Tag="Creates solid-color materials for each scheme entry."
+                                     IsChecked="{Binding SelectedMethod,
+                                         Converter={StaticResource EnumEqualConverter},
+                                         ConverterParameter=CreateMaterials}"/>
+                        <Separator Background="#22FFFFFF" Height="1" Margin="0"/>
+                        <RadioButton Style="{StaticResource MethodRadioStyle}"
+                                     Content="Apply to current view"
+                                     Tag="Apply to the active view — temporary or permanent."
+                                     IsChecked="{Binding SelectedMethod,
+                                         Converter={StaticResource EnumEqualConverter},
+                                         ConverterParameter=ApplyToCurrentView}"/>
+                        <Separator Background="#22FFFFFF" Height="1" Margin="0"/>
+                        <RadioButton Style="{StaticResource MethodRadioStyle}"
+                                     Content="Apply to selected views"
+                                     Tag="Pick specific views from the document."
+                                     IsChecked="{Binding SelectedMethod,
+                                         Converter={StaticResource EnumEqualConverter},
+                                         ConverterParameter=ApplyToSelectedViews}"/>
+                        <Separator Background="#22FFFFFF" Height="1" Margin="0"/>
+                        <RadioButton Style="{StaticResource MethodRadioStyle}"
+                                     Content="Apply to view templates"
+                                     Tag="Apply filter overrides to existing view templates."
+                                     IsChecked="{Binding SelectedMethod,
+                                         Converter={StaticResource EnumEqualConverter},
+                                         ConverterParameter=ApplyToViewTemplates}"/>
+                        <Separator Background="#22FFFFFF" Height="1" Margin="0"/>
+                        <RadioButton Style="{StaticResource MethodRadioStyle}"
+                                     Content="Generate view templates"
+                                     Tag="Create new view templates across Floor Plan, Area Plan, 3D, Section."
+                                     IsChecked="{Binding SelectedMethod,
+                                         Converter={StaticResource EnumEqualConverter},
+                                         ConverterParameter=GenerateViewTemplates}"/>
+                    </StackPanel>
+                </Border>
+
+                <Button Content="Next →"
+                        Style="{StaticResource PrimaryButton}"
+                        HorizontalAlignment="Right"
+                        MinWidth="120" Margin="0,16,0,0"
+                        Command="{Binding NextCommand}"/>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- Step 2: Configure + Apply -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      Visibility="{Binding IsOnStep1,
+                          Converter={StaticResource InverseBoolToVisibility}}">
+            <StackPanel Margin="36,24,36,24" MaxWidth="780">
+
+                <!-- Back + heading -->
+                <Grid Margin="0,0,0,20">
+                    <Button Content="← Back" HorizontalAlignment="Left"
+                            Style="{StaticResource SecondaryButton}"
+                            Command="{Binding BackCommand}"/>
+                    <TextBlock Text="{Binding SelectedMethod}"
+                               Style="{StaticResource H2}"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </Grid>
 
                 <!-- Scheme selector -->
                 <Border Style="{StaticResource CardBorder}">
                     <StackPanel>
-                        <TextBlock Text="Select Scheme" Style="{StaticResource H2}"/>
+                        <TextBlock Text="Select scheme" Style="{StaticResource H5}"
+                                   Margin="0,0,0,6"/>
                         <ComboBox Style="{StaticResource DLRComboBox}"
-                                  Margin="0,8,0,0"
                                   ItemsSource="{Binding AvailableSchemes}"
                                   SelectedItem="{Binding SelectedScheme}"
                                   DisplayMemberPath="Name"/>
-                        <Button Content="⟳  Refresh list" Margin="0,8,0,0"
-                                Style="{StaticResource SecondaryButton}"
-                                HorizontalAlignment="Left"
-                                Command="{Binding RefreshSchemesCommand}"/>
                     </StackPanel>
                 </Border>
 
-                <!-- Color fill scheme -->
-                <Border Style="{StaticResource CardBorder}">
+                <!-- Active view options -->
+                <Border Style="{StaticResource CardBorder}"
+                        Visibility="{Binding SelectedMethod,
+                            Converter={StaticResource EnumEqualConverter},
+                            ConverterParameter=ApplyToCurrentView}">
                     <StackPanel>
-                        <TextBlock Text="Room / Area Color Fill" Style="{StaticResource H2}"/>
-                        <TextBlock Style="{StaticResource MutedText}" Margin="0,4,0,12"
-                                   Text="Apply the color fill scheme directly to Revit views."/>
-                        <CheckBox Style="{StaticResource DLRCheckBox}"
-                                  Content="Apply to floor plan views"
-                                  IsChecked="{Binding ApplyToFloorPlans}"/>
-                        <CheckBox Style="{StaticResource DLRCheckBox}"
-                                  Content="Apply to area plan views"
-                                  IsChecked="{Binding ApplyToAreaPlans}"/>
-                        <Button Content="Apply color fill scheme"
-                                Style="{StaticResource PrimaryButton}"
-                                HorizontalAlignment="Left"
-                                MinWidth="200"
-                                Margin="0,12,0,0"
-                                Command="{Binding ApplyColorFillSchemeCommand}"/>
+                        <TextBlock Text="Application method" Style="{StaticResource H5}"
+                                   Margin="0,0,0,10"/>
+                        <RadioButton Style="{StaticResource DLRRadioButton}"
+                                     Content="Temporary — reverts when view is closed"
+                                     IsChecked="{Binding ApplyTemporary}"
+                                     GroupName="ViewMode"/>
+                        <RadioButton Style="{StaticResource DLRRadioButton}"
+                                     Content="Permanent — saved with the document"
+                                     IsChecked="{Binding ApplyPermanent}"
+                                     GroupName="ViewMode" Margin="0,6,0,0"/>
                     </StackPanel>
                 </Border>
 
-                <!-- Materials -->
-                <Border Style="{StaticResource CardBorder}">
+                <!-- Selected views -->
+                <Border Style="{StaticResource CardBorder}"
+                        Visibility="{Binding SelectedMethod,
+                            Converter={StaticResource EnumEqualConverter},
+                            ConverterParameter=ApplyToSelectedViews}">
                     <StackPanel>
-                        <TextBlock Text="Create Materials" Style="{StaticResource H2}"/>
-                        <TextBlock Style="{StaticResource MutedText}" Margin="0,4,0,12"
-                                   Text="Creates solid-color materials for each entry. Duplicates from 'Color Scheme' material if present, otherwise creates new materials. Naming: [Scheme] - [Entry]."/>
-                        <Button Content="Create / update materials"
-                                Style="{StaticResource PrimaryButton}"
-                                HorizontalAlignment="Left"
-                                MinWidth="200"
-                                Command="{Binding CreateMaterialsCommandCommand}"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- View filters -->
-                <Border Style="{StaticResource CardBorder}">
-                    <StackPanel>
-                        <TextBlock Text="View Filters" Style="{StaticResource H2}"/>
-                        <TextBlock Style="{StaticResource MutedText}" Margin="0,4,0,12"
-                                   Text="Creates parameter filters with solid color graphic overrides for each scheme entry."/>
-                        <Button Content="Create view filters"
-                                Style="{StaticResource PrimaryButton}"
-                                HorizontalAlignment="Left"
-                                MinWidth="200"
-                                Margin="0,0,0,8"
-                                Command="{Binding CreateViewFiltersCommandCommand}"/>
-                        <Button Content="Apply to active view (temporary)"
-                                Style="{StaticResource SecondaryButton}"
-                                HorizontalAlignment="Left"
-                                MinWidth="200"
-                                Command="{Binding ApplyTemporaryViewCommand}"
-                                ToolTip="Applies filters to the currently active view as temporary view properties"/>
-                    </StackPanel>
-                </Border>
-            </StackPanel>
-
-            <!-- ── Right column ───────────────────────────────────── -->
-            <StackPanel Grid.Column="2">
-
-                <!-- View template generator -->
-                <Border Style="{StaticResource CardBorder}">
-                    <StackPanel>
-                        <TextBlock Text="Generate View Templates" Style="{StaticResource H2}"/>
-                        <TextBlock Style="{StaticResource MutedText}" Margin="0,4,0,16"
-                                   Text="Creates view templates for selected schemes. Choose view types and color application method."/>
-
-                        <!-- View types -->
-                        <TextBlock Text="View types" Style="{StaticResource H5}" Margin="0,0,0,6"/>
-                        <WrapPanel>
-                            <CheckBox Style="{StaticResource DLRCheckBox}"
-                                      Content="Floor Plan" Margin="0,0,16,0"
-                                      IsChecked="{Binding VtFloorPlan}"/>
-                            <CheckBox Style="{StaticResource DLRCheckBox}"
-                                      Content="Area Plan" Margin="0,0,16,0"
-                                      IsChecked="{Binding VtAreaPlan}"/>
-                            <CheckBox Style="{StaticResource DLRCheckBox}"
-                                      Content="3D" Margin="0,0,16,0"
-                                      IsChecked="{Binding VtThreeD}"/>
-                            <CheckBox Style="{StaticResource DLRCheckBox}"
-                                      Content="Section"
-                                      IsChecked="{Binding VtSection}"/>
-                        </WrapPanel>
-
-                        <Separator Style="{StaticResource DLRSeparator}"/>
-
-                        <!-- Application method -->
-                        <TextBlock Text="Color application method" Style="{StaticResource H5}" Margin="0,0,0,6"/>
-                        <CheckBox Style="{StaticResource DLRCheckBox}"
-                                  Content="Color fill scheme (rooms / areas)"
-                                  IsChecked="{Binding VtUseColorFill}"/>
-                        <CheckBox Style="{StaticResource DLRCheckBox}"
-                                  Content="View filters (graphic overrides)"
-                                  IsChecked="{Binding VtUseFilters}"/>
-
-                        <Separator Style="{StaticResource DLRSeparator}"/>
-
-                        <!-- Scheme selection for batch -->
-                        <TextBlock Text="Select schemes to generate templates for"
-                                   Style="{StaticResource H5}" Margin="0,0,0,6"/>
-                        <Border Background="#22FFFFFF" CornerRadius="4" MaxHeight="180"
-                                Padding="0" Margin="0,0,0,16">
+                        <TextBlock Text="Select views" Style="{StaticResource H5}"
+                                   Margin="0,0,0,8"/>
+                        <Border Background="#1AFFFFFF" CornerRadius="4" MaxHeight="200">
                             <DataGrid Style="{StaticResource DLRDataGrid}"
-                                      ItemsSource="{Binding BatchSchemeRows}"
-                                      MaxHeight="180"
-                                      ColumnHeaderStyle="{StaticResource DLRDataGridColumnHeader}">
+                                      ItemsSource="{Binding SelectableViews}"
+                                      ColumnHeaderStyle="{StaticResource DLRDataGridColumnHeader}"
+                                      MaxHeight="200">
                                 <DataGrid.Columns>
                                     <DataGridTemplateColumn Width="36">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
-                                                <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                                                <CheckBox IsChecked="{Binding IsSelected,
+                                                              UpdateSourceTrigger=PropertyChanged}"
                                                           Style="{StaticResource DLRCheckBox}"
                                                           HorizontalAlignment="Center"/>
                                             </DataTemplate>
                                         </DataGridTemplateColumn.CellTemplate>
                                     </DataGridTemplateColumn>
-                                    <DataGridTextColumn Header="Scheme" Width="*"
-                                                        Binding="{Binding Name}"
+                                    <DataGridTextColumn Header="View name" Width="*"
+                                                        Binding="{Binding ViewName}"
+                                                        ElementStyle="{StaticResource H4}"/>
+                                    <DataGridTextColumn Header="Type" Width="120"
+                                                        Binding="{Binding ViewType}"
                                                         ElementStyle="{StaticResource H4}"/>
                                 </DataGrid.Columns>
                             </DataGrid>
                         </Border>
-
-                        <Button Content="Generate view templates"
-                                Style="{StaticResource PrimaryButton}"
-                                HorizontalAlignment="Left"
-                                MinWidth="220"
-                                Command="{Binding GenerateViewTemplatesCommand}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                            <CheckBox Style="{StaticResource DLRCheckBox}"
+                                      Margin="0,0,20,0"
+                                      Content="Remove existing view templates"
+                                      IsChecked="{Binding RemoveExistingTemplates}"/>
+                            <CheckBox Style="{StaticResource DLRCheckBox}"
+                                      Content="Update existing view templates"
+                                      IsChecked="{Binding UpdateExistingTemplates}"/>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 
-                <!-- Result -->
-                <Border Style="{StaticResource CardBorder}">
-                    <StackPanel>
-                        <TextBlock Text="Last operation" Style="{StaticResource H5}" Margin="0,0,0,4"/>
-                        <TextBlock Text="{Binding LastResult}"
-                                   Style="{StaticResource BodyText}"
-                                   TextWrapping="Wrap"/>
-                    </StackPanel>
+                <!-- Generate view templates options -->
+                <Border Style="{StaticResource CardBorder}"
+                        Visibility="{Binding SelectedMethod,
+                            Converter={StaticResource EnumEqualConverter},
+                            ConverterParameter=GenerateViewTemplates}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="20"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="View types" Style="{StaticResource H5}"
+                                       Margin="0,0,0,8"/>
+                            <CheckBox Style="{StaticResource DLRCheckBox}"
+                                      Content="Floor Plan" IsChecked="{Binding VtFloorPlan}"/>
+                            <CheckBox Style="{StaticResource DLRCheckBox}"
+                                      Content="Area Plan"  IsChecked="{Binding VtAreaPlan}"/>
+                            <CheckBox Style="{StaticResource DLRCheckBox}"
+                                      Content="3D"         IsChecked="{Binding VtThreeD}"/>
+                            <CheckBox Style="{StaticResource DLRCheckBox}"
+                                      Content="Section"    IsChecked="{Binding VtSection}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="Color method" Style="{StaticResource H5}"
+                                       Margin="0,0,0,8"/>
+                            <CheckBox Style="{StaticResource DLRCheckBox}"
+                                      Content="Color fill scheme"
+                                      IsChecked="{Binding VtUseColorFill}"/>
+                            <CheckBox Style="{StaticResource DLRCheckBox}"
+                                      Content="View filters"
+                                      IsChecked="{Binding VtUseFilters}"/>
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
+                <!-- Apply + result -->
+                <Grid Margin="0,4,0,0">
+                    <Button Content="Apply Scheme"
+                            Style="{StaticResource PrimaryButton}"
+                            HorizontalAlignment="Left" MinWidth="160"
+                            Command="{Binding ApplySchemeCommand}"/>
+                    <TextBlock Text="{Binding LastResult}"
+                               Style="{StaticResource MutedText}"
+                               HorizontalAlignment="Right"
+                               VerticalAlignment="Center"
+                               MaxWidth="400" TextWrapping="Wrap"/>
+                </Grid>
             </StackPanel>
-        </Grid>
-    </ScrollViewer>
+        </ScrollViewer>
+    </Grid>
 </UserControl>

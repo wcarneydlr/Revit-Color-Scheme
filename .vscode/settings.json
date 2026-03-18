@@ -1,0 +1,5 @@
+{
+    "dotnet.defaultSolution": "disable",
+    "csharp.debug.justMyCode": false,
+    "editor.formatOnSave": true
+}

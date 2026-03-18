@@ -62,8 +62,63 @@ namespace ColorSchemeAddin.Views
         public object ConvertBack(object value, Type t, object p, CultureInfo c)
         {
             if (value is string s && int.TryParse(s, out int n))
-                return (byte)Math.Clamp(n, 0, 255);
+                return (byte)Math.Max(0, Math.Min(255, n));
             return (byte)0;
         }
     }
+    /// <summary>
+    /// int == int parameter -> Visible/true, else Collapsed/false.
+    /// Used to show/hide views based on SelectedTabIndex.
+    /// </summary>
+    public class IntEqualConverter : IValueConverter
+    {
+        public static readonly IntEqualConverter Instance = new();
+
+        public object Convert(object value, Type t, object p, CultureInfo c)
+        {
+            if (value is int v && p != null && int.TryParse(p.ToString(), out int target))
+            {
+                if (t == typeof(Visibility))
+                    return v == target ? Visibility.Visible : Visibility.Collapsed;
+                return v == target;
+            }
+            return t == typeof(Visibility) ? Visibility.Collapsed : (object)false;
+        }
+
+        public object ConvertBack(object value, Type t, object p, CultureInfo c)
+        {
+            if (value is true && p != null && int.TryParse(p.ToString(), out int target))
+                return target;
+            return System.Windows.Data.Binding.DoNothing;
+        }
+    }
+    /// <summary>bool -> "✓" or "–"</summary>
+    public class BoolToCheckmarkConverter : IValueConverter
+    {
+        public static readonly BoolToCheckmarkConverter Instance = new();
+        public object Convert(object value, Type t, object p, CultureInfo c)
+            => value is true ? "✓" : "–";
+        public object ConvertBack(object value, Type t, object p, CultureInfo c)
+            => throw new NotImplementedException();
+    }
+
+    /// <summary>Enum == string parameter -> Visible/true, else Collapsed/false.</summary>
+    public class EnumEqualConverter : IValueConverter
+    {
+        public static readonly EnumEqualConverter Instance = new();
+        public object Convert(object value, Type t, object p, CultureInfo c)
+        {
+            if (value == null || p == null) return t == typeof(Visibility) ? Visibility.Collapsed : (object)false;
+            bool equal = value.ToString() == p.ToString();
+            if (t == typeof(Visibility)) return equal ? Visibility.Visible : Visibility.Collapsed;
+            return equal;
+        }
+        public object ConvertBack(object value, Type t, object p, CultureInfo c)
+        {
+            if (value is true && p != null)
+                return Enum.Parse(t, p.ToString()!);
+            return System.Windows.Data.Binding.DoNothing;
+        }
+    }
+
 }

@@ -2,23 +2,20 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              Background="#FF283342">
-
     <UserControl.Resources>
         <ResourceDictionary Source="../Resources/DLRStyles.xaml"/>
     </UserControl.Resources>
 
     <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="36,24,36,24" MaxWidth="900">
+        <StackPanel Margin="36,24,36,24" MaxWidth="860">
 
-            <!-- ── Section: Import from Excel ─────────────────────────── -->
+            <!-- Card 1: Upload Excel -->
             <Border Style="{StaticResource CardBorder}">
                 <StackPanel>
-                    <TextBlock Text="Import from Excel" Style="{StaticResource H2}"/>
-                    <TextBlock Style="{StaticResource MutedText}" Margin="0,0,0,16"
-                               Text="Upload a populated Excel template to create one or more color schemes. Each sheet in the workbook becomes a separate scheme."/>
-
-                    <!-- File picker row -->
-                    <Grid Margin="0,0,0,12">
+                    <TextBlock Text="Upload Excel" Style="{StaticResource H2}"/>
+                    <TextBlock Style="{StaticResource MutedText}" Margin="0,4,0,14"
+                               Text="Import a populated template to create one or more schemes. Each sheet becomes a separate scheme."/>
+                    <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
@@ -27,49 +24,146 @@
                         <TextBox Grid.Column="0" Margin="0,0,8,0"
                                  Style="{StaticResource DLRTextBox}"
                                  Text="{Binding ImportFilePath, Mode=OneWay}"
-                                 IsReadOnly="True"
-                                 PlaceholderText="No file selected…"/>
+                                 IsReadOnly="True"/>
                         <Button Grid.Column="1" Content="Browse…" Margin="0,0,8,0"
                                 Style="{StaticResource SecondaryButton}"
                                 Command="{Binding BrowseImportFileCommand}"/>
-                        <Button Grid.Column="2" Content="Download Template"
+                        <Button Grid.Column="2" Content="Download template"
                                 Style="{StaticResource SecondaryButton}"
-                                Command="{Binding DownloadTemplateCommand}"
-                                ToolTip="Download a blank Excel template to fill in"/>
+                                Command="{Binding DownloadTemplateCommand}"/>
                     </Grid>
-
-                    <!-- Imported schemes preview -->
-                    <TextBlock Text="Schemes found in file:" Style="{StaticResource H5}"
-                               Margin="0,0,0,6"
-                               Visibility="{Binding ImportedSchemes.Count, Converter={x:Static ZeroToCollapsedConverter}}"/>
                     <ListBox ItemsSource="{Binding ImportedSchemes}"
                              SelectedItem="{Binding SelectedImportedScheme}"
-                             Background="#22FFFFFF"
-                             BorderThickness="0"
-                             MaxHeight="120"
-                             Visibility="{Binding ImportedSchemes.Count, Converter={x:Static ZeroToCollapsedConverter}}">
+                             Background="#1AFFFFFF" BorderThickness="0" MaxHeight="110"
+                             Visibility="{Binding ImportedSchemes.Count,
+                                 Converter={StaticResource ZeroToCollapsed}}">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Orientation="Horizontal" Margin="8,4">
-                                    <TextBlock Text="{Binding Name}" Style="{StaticResource H4Bold}"
+                                <StackPanel Orientation="Horizontal" Margin="8,3">
+                                    <TextBlock Text="{Binding Name}"
+                                               Style="{StaticResource H4Bold}"
                                                VerticalAlignment="Center"/>
-                                    <TextBlock Text=" · " Style="{StaticResource MutedText}" VerticalAlignment="Center"/>
-                                    <TextBlock Style="{StaticResource MutedText}" VerticalAlignment="Center">
-                                        <Run Text="{Binding Entries.Count, Mode=OneWay}"/><Run Text=" entries"/>
+                                    <TextBlock Style="{StaticResource MutedText}"
+                                               VerticalAlignment="Center" Margin="8,0,0,0">
+                                        <Run Text="{Binding Entries.Count, Mode=OneWay}"/>
+                                        <Run Text=" entries"/>
                                     </TextBlock>
                                 </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
+                    <Button Content="Upload and Create"
+                            Style="{StaticResource PrimaryButton}"
+                            HorizontalAlignment="Left" MinWidth="180"
+                            Margin="0,12,0,0"
+                            Command="{Binding CreateFromImportCommand}"/>
                 </StackPanel>
             </Border>
 
-            <!-- ── Section: Import from existing Revit scheme ─────────── -->
+            <!-- Card 2: Create from scratch -->
             <Border Style="{StaticResource CardBorder}">
                 <StackPanel>
-                    <TextBlock Text="Copy from existing Revit scheme" Style="{StaticResource H2}"/>
-                    <TextBlock Style="{StaticResource MutedText}" Margin="0,0,0,16"
-                               Text="Select an existing Color Fill Scheme from this document to use as a starting point."/>
+                    <TextBlock Text="Create from scratch" Style="{StaticResource H2}"/>
+                    <TextBlock Style="{StaticResource MutedText}" Margin="0,4,0,14"
+                               Text="Start with a blank scheme and define your colors and values manually."/>
+                    <TextBlock Text="Scheme name" Style="{StaticResource H5}" Margin="0,0,0,6"/>
+                    <TextBox Style="{StaticResource DLRTextBox}" Margin="0,0,0,12"
+                             Text="{Binding ScratchSchemeName,
+                                 UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <!-- Entry list header -->
+                    <Grid Margin="0,0,0,4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="24"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="70"/>
+                            <ColumnDefinition Width="36"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="1" Text="Entry name"
+                                   Style="{StaticResource H5}" Margin="4,0"/>
+                        <TextBlock Grid.Column="2" Text="R"
+                                   Style="{StaticResource H5}" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="3" Text="G"
+                                   Style="{StaticResource H5}" HorizontalAlignment="Center"/>
+                        <TextBlock Grid.Column="4" Text="B"
+                                   Style="{StaticResource H5}" HorizontalAlignment="Center"/>
+                    </Grid>
+
+                    <!-- Entry rows -->
+                    <ItemsControl ItemsSource="{Binding ScratchScheme.Entries}" MaxHeight="220">
+                        <ItemsControl.Template>
+                            <ControlTemplate>
+                                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                    <ItemsPresenter/>
+                                </ScrollViewer>
+                            </ControlTemplate>
+                        </ItemsControl.Template>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="24"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="70"/>
+                                        <ColumnDefinition Width="70"/>
+                                        <ColumnDefinition Width="70"/>
+                                        <ColumnDefinition Width="36"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Column="0" Style="{StaticResource ColorSwatch}"
+                                            Background="{Binding PreviewBrush}"
+                                            VerticalAlignment="Center"/>
+                                    <TextBox Grid.Column="1" Margin="4,0,6,0"
+                                             Style="{StaticResource DLRTextBox}"
+                                             Text="{Binding Value,
+                                                 UpdateSourceTrigger=PropertyChanged}"/>
+                                    <TextBox Grid.Column="2" Margin="0,0,4,0"
+                                             Style="{StaticResource DLRTextBox}"
+                                             TextAlignment="Center"
+                                             Text="{Binding R,
+                                                 UpdateSourceTrigger=PropertyChanged,
+                                                 Converter={StaticResource ByteClamp}}"/>
+                                    <TextBox Grid.Column="3" Margin="0,0,4,0"
+                                             Style="{StaticResource DLRTextBox}"
+                                             TextAlignment="Center"
+                                             Text="{Binding G,
+                                                 UpdateSourceTrigger=PropertyChanged,
+                                                 Converter={StaticResource ByteClamp}}"/>
+                                    <TextBox Grid.Column="4" Margin="0,0,4,0"
+                                             Style="{StaticResource DLRTextBox}"
+                                             TextAlignment="Center"
+                                             Text="{Binding B,
+                                                 UpdateSourceTrigger=PropertyChanged,
+                                                 Converter={StaticResource ByteClamp}}"/>
+                                    <Button Grid.Column="5" Content="✕"
+                                            Style="{StaticResource IconButton}"
+                                            Padding="0" Width="28"
+                                            Command="{Binding DataContext.RemoveScratchEntryCommand,
+                                                RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
+                        <Button Content="+ Add entry" Margin="0,0,8,0"
+                                Style="{StaticResource SecondaryButton}"
+                                Command="{Binding AddScratchEntryCommand}"/>
+                        <Button Content="Create New Scheme"
+                                Style="{StaticResource PrimaryButton}" MinWidth="180"
+                                Command="{Binding CreateFromScratchCommand}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Card 3: From existing Revit scheme -->
+            <Border Style="{StaticResource CardBorder}">
+                <StackPanel>
+                    <TextBlock Text="From existing scheme" Style="{StaticResource H2}"/>
+                    <TextBlock Style="{StaticResource MutedText}" Margin="0,4,0,14"
+                               Text="Select an existing Revit Color Fill scheme to use as a base."/>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -79,52 +173,45 @@
                                   Style="{StaticResource DLRComboBox}"
                                   ItemsSource="{Binding ExistingRevitSchemes}"
                                   SelectedItem="{Binding SelectedRevitScheme}"
-                                  DisplayMemberPath="Name"
-                                  PlaceholderText="Select a Revit color scheme…"/>
+                                  DisplayMemberPath="Name"/>
                         <Button Grid.Column="1" Content="Load scheme"
-                                Style="{StaticResource SecondaryButton}"
+                                Style="{StaticResource PrimaryButton}"
                                 Command="{Binding ImportFromRevitSchemeCommand}"/>
                     </Grid>
                 </StackPanel>
             </Border>
 
-            <!-- ── Section: Scheme settings ───────────────────────────── -->
+            <!-- Shared settings -->
             <Border Style="{StaticResource CardBorder}">
-                <StackPanel>
-                    <TextBlock Text="Scheme settings" Style="{StaticResource H2}"/>
-
-                    <!-- Parameter -->
-                    <TextBlock Text="Color fill parameter" Style="{StaticResource H5}" Margin="0,0,0,6"/>
-                    <ComboBox Style="{StaticResource DLRComboBox}"
-                              ItemsSource="{Binding AvailableParameters}"
-                              SelectedItem="{Binding ParameterName}"
-                              Margin="0,0,0,16"/>
-
-                    <!-- Target category -->
-                    <TextBlock Text="Apply to" Style="{StaticResource H5}" Margin="0,0,0,6"/>
-                    <StackPanel Orientation="Horizontal">
-                        <CheckBox Style="{StaticResource DLRCheckBox}"
-                                  Content="Rooms"
-                                  IsChecked="{Binding TargetRooms}"
-                                  Margin="0,0,20,0"/>
-                        <CheckBox Style="{StaticResource DLRCheckBox}"
-                                  Content="Areas"
-                                  IsChecked="{Binding TargetAreas}"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="20"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Fill parameter" Style="{StaticResource H5}"
+                                   Margin="0,0,0,6"/>
+                        <ComboBox Style="{StaticResource DLRComboBox}"
+                                  ItemsSource="{Binding AvailableParameters}"
+                                  SelectedItem="{Binding ParameterName}"/>
                     </StackPanel>
-                </StackPanel>
+                    <StackPanel Grid.Column="2">
+                        <TextBlock Text="Apply to" Style="{StaticResource H5}"
+                                   Margin="0,0,0,8"/>
+                        <CheckBox Style="{StaticResource DLRCheckBox}"
+                                  Content="Rooms" IsChecked="{Binding TargetRooms}"/>
+                        <CheckBox Style="{StaticResource DLRCheckBox}"
+                                  Content="Areas" IsChecked="{Binding TargetAreas}"/>
+                    </StackPanel>
+                </Grid>
             </Border>
 
-            <!-- ── Create button + result ──────────────────────────────── -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-                <TextBlock Text="{Binding LastResult}" Style="{StaticResource MutedText}"
-                           VerticalAlignment="Center" Margin="0,0,16,0"/>
-                <Button Content="Create Scheme"
-                        Style="{StaticResource PrimaryButton}"
-                        MinWidth="160"
-                        Command="{Binding CreateFromImportCommand}"
-                        ToolTip="Create the selected scheme in the Revit document"/>
-            </StackPanel>
-
+            <TextBlock Text="{Binding LastResult}"
+                       Style="{StaticResource MutedText}"
+                       Margin="0,0,0,24"
+                       Visibility="{Binding LastResult,
+                           Converter={StaticResource NullToCollapsed}}"/>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

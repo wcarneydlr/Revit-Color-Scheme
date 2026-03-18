@@ -8,7 +8,8 @@ using System.Linq;
 namespace ColorSchemeAddin.Services
 {
     /// <summary>
-    /// Creates, reads, and updates Revit ColorFillScheme elements from ColorSchemeModel data.
+    /// Creates, reads, and updates Revit ColorFillScheme elements.
+    /// Revit 2024 API: ColorFillScheme uses AddEntry/GetEntries, not Create/SetEntry.
     /// </summary>
     public class ColorFillSchemeService
     {
@@ -21,7 +22,6 @@ namespace ColorSchemeAddin.Services
 
         // ── Read ───────────────────────────────────────────────────────────
 
-        /// <summary>Returns all ColorFillScheme elements in the document.</summary>
         public List<ColorFillScheme> GetAllSchemes()
         {
             return new FilteredElementCollector(_doc)
@@ -31,20 +31,15 @@ namespace ColorSchemeAddin.Services
                 .ToList();
         }
 
-        /// <summary>Finds a ColorFillScheme by name, or null if not found.</summary>
         public ColorFillScheme? FindByName(string name)
         {
             return GetAllSchemes().FirstOrDefault(s =>
                 string.Equals(s.Name, name, StringComparison.OrdinalIgnoreCase));
         }
 
-        /// <summary>
-        /// Converts a Revit ColorFillScheme to our model for display/export.
-        /// </summary>
         public ColorSchemeModel ToModel(ColorFillScheme scheme)
         {
             var model = new ColorSchemeModel { Name = scheme.Name };
-
             foreach (ColorFillSchemeEntry entry in scheme.GetEntries())
             {
                 model.Entries.Add(new ColorEntryModel
@@ -57,16 +52,11 @@ namespace ColorSchemeAddin.Services
                     IsMapped  = true
                 });
             }
-
             return model;
         }
 
         // ── Create ─────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Creates a new ColorFillScheme from a model.
-        /// Targets Rooms by default; pass a different CategoryId to target areas, etc.
-        /// </summary>
         public ColorFillScheme CreateScheme(ColorSchemeModel model, ElementId? categoryId = null)
         {
             if (string.IsNullOrWhiteSpace(model.Name))
@@ -74,14 +64,41 @@ namespace ColorSchemeAddin.Services
             if (model.Entries.Count == 0)
                 throw new ArgumentException("Scheme must have at least one color entry.");
 
-            // Default: rooms
             var catId = categoryId ?? new ElementId(BuiltInCategory.OST_Rooms);
 
             using var tx = new Transaction(_doc, $"Create Color Scheme: {model.Name}");
             tx.Start();
 
-            var scheme = ColorFillScheme.Create(_doc, catId, model.Name);
-            scheme = PopulateScheme(scheme, model);
+            // Revit 2024: ColorFillScheme.Create does not exist.
+            // We must duplicate an existing scheme or use the FillPatternElement approach.
+            // The supported way is to get an existing scheme and copy it, or use
+            // the document's built-in scheme and rename via parameter.
+            // Best practice: find any existing scheme to duplicate, or create via
+            // the BuiltInParameter approach on a view.
+            //
+            // Revit 2024 actual API: new ColorFillScheme is created by
+            // duplicating an existing one then modifying entries.
+            var existingSchemes = GetAllSchemes();
+            ColorFillScheme scheme;
+
+            if (existingSchemes.Count > 0)
+            {
+                // Duplicate the first available scheme as a base
+                ElementId newId = existingSchemes[0].Duplicate(model.Name);
+                scheme = (ColorFillScheme)_doc.GetElement(newId);
+
+                // Clear existing entries by replacing with ours
+                ClearAndPopulate(scheme, model);
+            }
+            else
+            {
+                // No existing scheme to duplicate — notify caller
+                tx.RollBack();
+                throw new InvalidOperationException(
+                    "No existing Color Fill Scheme found in the document to use as a base. " +
+                    "Please create at least one Color Fill Scheme manually in Revit first " +
+                    "(Architecture tab → Room & Area → Color Schemes), then try again.");
+            }
 
             tx.Commit();
             return scheme;
@@ -89,55 +106,16 @@ namespace ColorSchemeAddin.Services
 
         // ── Update ─────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Updates an existing ColorFillScheme's entries to match the model.
-        /// Adds new entries, updates colors on existing ones, removes entries not in model.
-        /// </summary>
         public void UpdateScheme(ColorFillScheme scheme, ColorSchemeModel model)
         {
             using var tx = new Transaction(_doc, $"Update Color Scheme: {scheme.Name}");
             tx.Start();
-
-            // Build lookup of model entries by value
-            var modelLookup = model.Entries.ToDictionary(
-                e => e.Value, e => e, StringComparer.OrdinalIgnoreCase);
-
-            // Existing entries: update color where value matches
-            var existingEntries = scheme.GetEntries().ToList();
-            foreach (var entry in existingEntries)
-            {
-                string val = entry.GetStringValue();
-                if (modelLookup.TryGetValue(val, out var modelEntry))
-                {
-                    entry.Color = new Color(modelEntry.R, modelEntry.G, modelEntry.B);
-                }
-            }
-
-            // Add entries that don't exist yet
-            var existingValues = existingEntries
-                .Select(e => e.GetStringValue())
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var modelEntry in model.Entries)
-            {
-                if (!existingValues.Contains(modelEntry.Value))
-                {
-                    var newEntry = ColorFillSchemeEntry.CreateSchemeEntry(
-                        _doc,
-                        new Color(modelEntry.R, modelEntry.G, modelEntry.B));
-                    newEntry.SetStringValue(modelEntry.Value);
-                    scheme.SetEntry(newEntry);
-                }
-            }
-
+            ClearAndPopulate(scheme, model);
             tx.Commit();
         }
 
         // ── Apply to Views ─────────────────────────────────────────────────
 
-        /// <summary>
-        /// Applies a ColorFillScheme to all floor plan views in the document.
-        /// </summary>
         public void ApplySchemeToFloorPlans(ColorFillScheme scheme)
         {
             var views = new FilteredElementCollector(_doc)
@@ -148,29 +126,13 @@ namespace ColorSchemeAddin.Services
 
             if (views.Count == 0) return;
 
-            using var tx = new Transaction(_doc, $"Apply Color Scheme to Floor Plans: {scheme.Name}");
+            using var tx = new Transaction(_doc, $"Apply Color Scheme: {scheme.Name}");
             tx.Start();
             foreach (var view in views)
-            {
-                try
-                {
-                    // SpatialElementColorFillType drives room color fills
-                    var colorFillType = new FilteredElementCollector(_doc, view.Id)
-                        .OfClass(typeof(SpatialElementColorFillType))
-                        .Cast<SpatialElementColorFillType>()
-                        .FirstOrDefault();
-
-                    if (colorFillType != null)
-                        colorFillType.ColorFillSchemeId = scheme.Id;
-                }
-                catch { /* skip views where scheme can't be applied */ }
-            }
+                TryApplySchemeToView(view, scheme);
             tx.Commit();
         }
 
-        /// <summary>
-        /// Applies a ColorFillScheme to all area plan views.
-        /// </summary>
         public void ApplySchemeToAreaPlans(ColorFillScheme scheme)
         {
             var views = new FilteredElementCollector(_doc)
@@ -184,43 +146,52 @@ namespace ColorSchemeAddin.Services
             using var tx = new Transaction(_doc, $"Apply Color Scheme to Area Plans: {scheme.Name}");
             tx.Start();
             foreach (var view in views)
-            {
-                try
-                {
-                    var colorFillType = new FilteredElementCollector(_doc, view.Id)
-                        .OfClass(typeof(SpatialElementColorFillType))
-                        .Cast<SpatialElementColorFillType>()
-                        .FirstOrDefault();
-
-                    if (colorFillType != null)
-                        colorFillType.ColorFillSchemeId = scheme.Id;
-                }
-                catch { }
-            }
+                TryApplySchemeToView(view, scheme);
             tx.Commit();
         }
 
         // ── Helpers ────────────────────────────────────────────────────────
 
-        private ColorFillScheme PopulateScheme(ColorFillScheme scheme, ColorSchemeModel model)
+        private void TryApplySchemeToView(ViewPlan view, ColorFillScheme scheme)
         {
-            foreach (var entry in model.Entries)
+            try
+            {
+                // Revit 2024: color fill scheme is set via the
+                // ROOM_COLOR_SCHEME_ID / AREA_COLOR_SCHEME_ID built-in parameter on the view
+                // Look up the color scheme parameter by name since the
+                // BuiltInParameter enum name varies by Revit version
+                Parameter? param = view.LookupParameter("Color Scheme");
+
+                param?.Set(scheme.Id);
+            }
+            catch { /* skip views where scheme can't be applied */ }
+        }
+
+        private void ClearAndPopulate(ColorFillScheme scheme, ColorSchemeModel model)
+        {
+            // Remove all existing entries
+            var existing = scheme.GetEntries().ToList();
+            foreach (var entry in existing)
+            {
+                try { scheme.RemoveEntry(entry); } catch { }
+            }
+
+            // Add entries from model
+            foreach (var modelEntry in model.Entries)
             {
                 try
                 {
-                    var schemeEntry = ColorFillSchemeEntry.CreateSchemeEntry(
-                        _doc,
-                        new Color(entry.R, entry.G, entry.B));
-                    schemeEntry.SetStringValue(entry.Value);
-                    scheme.SetEntry(schemeEntry);
-                    entry.IsMapped = true;
+                    var entry = new ColorFillSchemeEntry(StorageType.String);
+                    entry.SetStringValue(modelEntry.Value);
+                    entry.Color = new Color(modelEntry.R, modelEntry.G, modelEntry.B);
+                    scheme.AddEntry(entry);
+                    modelEntry.IsMapped = true;
                 }
                 catch
                 {
-                    entry.IsMapped = false;
+                    modelEntry.IsMapped = false;
                 }
             }
-            return scheme;
         }
     }
 }

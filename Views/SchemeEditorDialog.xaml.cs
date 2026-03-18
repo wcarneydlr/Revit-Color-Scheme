@@ -13,8 +13,6 @@ namespace ColorSchemeAddin.Views
         public System.Collections.ObjectModel.ObservableCollection<ColorEntryModel> Entries
             => Model.Entries;
 
-        public string Name => Model.Name;
-
         public SchemeEditorDialog(ColorSchemeModel model, Document doc)
         {
             _doc = doc;
@@ -34,7 +32,7 @@ namespace ColorSchemeAddin.Views
                     FullOpen = true,
                     AnyColor = true
                 };
-                if (dlg.ShowDialog() == DialogResult.OK)
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
                     entry.R = dlg.Color.R;
                     entry.G = dlg.Color.G;

@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
@@ -20,13 +21,11 @@ namespace ColorSchemeAddin.ViewModels
 
         [ObservableProperty] private ObservableCollection<ColorSchemeRowModel> _schemeRows = new();
         [ObservableProperty] private ColorSchemeRowModel? _selectedRow;
-        [ObservableProperty] private string _filterText = string.Empty;
 
         public ManageSchemeViewModel(Document doc, MainDashboardViewModel main)
         {
-            _doc = doc;
+            _doc  = doc;
             _main = main;
-            RefreshSchemes();
         }
 
         // ── Commands ───────────────────────────────────────────────────────
@@ -38,18 +37,46 @@ namespace ColorSchemeAddin.ViewModels
             {
                 SchemeRows.Clear();
                 var service = new ColorFillSchemeService(_doc);
+                var matSvc  = new MaterialService(_doc);
+                var vtSvc   = new ViewTemplateService(_doc);
+
                 foreach (var scheme in service.GetAllSchemes())
                 {
                     var model = service.ToModel(scheme);
-                    SchemeRows.Add(new ColorSchemeRowModel
+                    var mats  = matSvc.GetMaterialsForScheme(scheme.Name);
+
+                    // Detect which application methods are active for this scheme
+                    var row = new ColorSchemeRowModel
                     {
-                        RevitScheme  = scheme,
-                        Name         = scheme.Name,
-                        EntryCount   = model.Entries.Count,
-                        CategoryName = GetCategoryName(scheme),
-                        Model        = model
-                    });
+                        RevitScheme      = scheme,
+                        Name             = scheme.Name,
+                        EntryCount       = model.Entries.Count,
+                        CategoryName     = GetCategoryName(scheme),
+                        Model            = model,
+                        HasMaterials     = mats.Count > 0,
+                        HasRooms         = scheme.CategoryId == new ElementId(BuiltInCategory.OST_Rooms),
+                        HasAreas         = scheme.CategoryId == new ElementId(BuiltInCategory.OST_Areas),
+                        HasFloors        = scheme.CategoryId == new ElementId(BuiltInCategory.OST_Floors),
+                        HasGenericModels = scheme.CategoryId == new ElementId(BuiltInCategory.OST_GenericModel),
+                    };
+
+                    // Detect view templates by naming convention
+                    var allTemplates = new FilteredElementCollector(_doc)
+                        .OfClass(typeof(View))
+                        .Cast<View>()
+                        .Where(v => v.Name.StartsWith(scheme.Name + " - "))
+                        .ToList();
+
+                    row.Has3D        = allTemplates.Any(v => v.Name.EndsWith("3D"));
+                    row.HasFloorPlan = allTemplates.Any(v => v.Name.EndsWith("Floor Plan"));
+                    row.HasAreaPlan  = allTemplates.Any(v => v.Name.EndsWith("Area Plan"));
+
+                    // Status: applied if any view uses this scheme
+                    row.IsApplied = IsSchemeAppliedToAnyView(scheme);
+
+                    SchemeRows.Add(row);
                 }
+
                 _main.SetStatus($"Loaded {SchemeRows.Count} color scheme(s).");
             }
             catch (Exception ex)
@@ -71,13 +98,13 @@ namespace ColorSchemeAddin.ViewModels
                 {
                     var service = new ColorFillSchemeService(_doc);
                     service.UpdateScheme(row.RevitScheme, row.Model);
-                    row.EntryCount = row.Model.Entries.Count;
                     _main.SetStatus($"Updated scheme '{row.Name}'.");
                     RefreshSchemes();
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show(ex.Message, "Update Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(ex.Message, "Update Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
                 }
             }
         }
@@ -88,29 +115,11 @@ namespace ColorSchemeAddin.ViewModels
             var toExport = SchemeRows.Where(r => r.IsSelected).Select(r => r.Model).ToList();
             if (!toExport.Any())
             {
-                MessageBox.Show("Check at least one scheme to export.", "No Selection",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Check at least one scheme to export.",
+                    "No Selection", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
-
-            var dlg = new SaveFileDialog
-            {
-                Title = "Export Color Schemes to Excel",
-                Filter = "Excel Files (*.xlsx)|*.xlsx",
-                FileName = "DLR_Color_Schemes_Export.xlsx"
-            };
-            if (dlg.ShowDialog() == true)
-            {
-                try
-                {
-                    ExcelService.ExportToFile(toExport, dlg.FileName);
-                    _main.SetStatus($"Exported {toExport.Count} scheme(s) to {Path.GetFileName(dlg.FileName)}.");
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message, "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
+            DoExport(toExport);
         }
 
         [RelayCommand]
@@ -118,29 +127,15 @@ namespace ColorSchemeAddin.ViewModels
         {
             if (!SchemeRows.Any())
             {
-                MessageBox.Show("No schemes to export.", "Empty", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("No schemes to export.",
+                    "Empty", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
-
-            var dlg = new SaveFileDialog
-            {
-                Title = "Export All Color Schemes to Excel",
-                Filter = "Excel Files (*.xlsx)|*.xlsx",
-                FileName = "DLR_Color_Schemes_All.xlsx"
-            };
-            if (dlg.ShowDialog() == true)
-            {
-                try
-                {
-                    ExcelService.ExportToFile(SchemeRows.Select(r => r.Model), dlg.FileName);
-                    _main.SetStatus($"Exported {SchemeRows.Count} scheme(s) to {Path.GetFileName(dlg.FileName)}.");
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show(ex.Message, "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                }
-            }
+            DoExport(SchemeRows.Select(r => r.Model));
         }
+
+        [RelayCommand]
+        private void AddNewScheme() => _main.NavigateToCreate();
 
         [RelayCommand]
         private void SelectAll(bool selected)
@@ -150,27 +145,75 @@ namespace ColorSchemeAddin.ViewModels
 
         // ── Helpers ────────────────────────────────────────────────────────
 
+        private void DoExport(IEnumerable<ColorSchemeModel> models)
+        {
+            var dlg = new SaveFileDialog
+            {
+                Title    = "Export Color Schemes to Excel",
+                Filter   = "Excel Files (*.xlsx)|*.xlsx",
+                FileName = "DLR_Color_Schemes_Export.xlsx"
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                try
+                {
+                    ExcelService.ExportToFile(models, dlg.FileName);
+                    _main.SetStatus($"Exported to {Path.GetFileName(dlg.FileName)}.");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(ex.Message, "Export Error",
+                        MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+        }
+
         private string GetCategoryName(ColorFillScheme scheme)
         {
             try
             {
-                var catId = scheme.CategoryId;
-                var cat = Category.GetCategory(_doc, catId);
-                return cat?.Name ?? catId.ToString();
+                var cat = Category.GetCategory(_doc, scheme.CategoryId);
+                return cat?.Name ?? "Unknown";
             }
             catch { return "Unknown"; }
         }
+
+        private bool IsSchemeAppliedToAnyView(ColorFillScheme scheme)
+        {
+            try
+            {
+                return new FilteredElementCollector(_doc)
+                    .OfClass(typeof(ViewPlan))
+                    .Cast<ViewPlan>()
+                    .Any(v =>
+                    {
+                        var p = v.LookupParameter("Color Scheme");
+                        return p != null && p.AsElementId() == scheme.Id;
+                    });
+            }
+            catch { return false; }
+        }
     }
 
-    /// <summary>One row in the Manage grid.</summary>
     public partial class ColorSchemeRowModel : ObservableObject
     {
         [ObservableProperty] private bool _isSelected;
-        [ObservableProperty] private int _entryCount;
+        [ObservableProperty] private int  _entryCount;
+        [ObservableProperty] private bool _isApplied;
 
-        public ColorFillScheme RevitScheme { get; set; } = null!;
-        public string Name { get; set; } = string.Empty;
-        public string CategoryName { get; set; } = string.Empty;
-        public ColorSchemeModel Model { get; set; } = null!;
+        public ColorFillScheme  RevitScheme      { get; set; } = null!;
+        public string           Name             { get; set; } = string.Empty;
+        public string           CategoryName     { get; set; } = string.Empty;
+        public ColorSchemeModel Model            { get; set; } = null!;
+
+        // Application method flags — shown as columns in the grid
+        public bool HasGenericModels { get; set; }
+        public bool HasRooms         { get; set; }
+        public bool HasAreas         { get; set; }
+        public bool HasFloors        { get; set; }
+        public bool HasMaterials     { get; set; }
+        public bool Has3D            { get; set; }
+        public bool HasFloorPlan     { get; set; }
+        public bool HasAreaPlan      { get; set; }
     }
 }

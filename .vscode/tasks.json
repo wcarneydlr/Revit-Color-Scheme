@@ -1,0 +1,49 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/ColorSchemeAddin.csproj",
+                "/property:GenerateFullPaths=true",
+                "/p:Configuration=Debug",
+                "/consoleloggerparameters:NoSummary"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "deploy",
+            "type": "shell",
+            "command": "Copy-Item",
+            "args": [
+                "-Path",
+                "'${workspaceFolder}\\bin\\Debug\\net48\\*'",
+                "-Destination",
+                "$env:APPDATA\\Autodesk\\Revit\\Addins\\2024\\",
+                "-Recurse",
+                "-Force"
+            ],
+            "options": {
+                "shell": {
+                    "executable": "pwsh.exe",
+                    "args": ["-NoProfile", "-Command"]
+                }
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "build and deploy",
+            "dependsOrder": "sequence",
+            "dependsOn": ["build", "deploy"],
+            "group": "none",
+            "problemMatcher": []
+        }
+    ]
+}
