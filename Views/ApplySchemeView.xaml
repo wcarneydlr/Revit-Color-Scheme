@@ -93,6 +93,44 @@
                     </StackPanel>
                 </Border>
 
+                <!-- View template picker for Apply to View Templates -->
+                <Border Style="{StaticResource CardBorder}"
+                        Visibility="{Binding SelectedMethod,
+                            Converter={StaticResource EnumEqualConverter},
+                            ConverterParameter=ApplyToViewTemplates}">
+                    <StackPanel>
+                        <TextBlock Text="Select view templates" Style="{StaticResource H5}"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock Style="{StaticResource MutedText}" Margin="0,0,0,8"
+                                   Text="Check templates to update. Leave all unchecked to apply to all templates."/>
+                        <Border Background="#1AFFFFFF" CornerRadius="4" MaxHeight="200">
+                            <DataGrid Style="{StaticResource DLRDataGrid}"
+                                      ItemsSource="{Binding SelectableTemplates}"
+                                      ColumnHeaderStyle="{StaticResource DLRDataGridColumnHeader}"
+                                      MaxHeight="200">
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn Width="36">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <CheckBox IsChecked="{Binding IsSelected,
+                                                              UpdateSourceTrigger=PropertyChanged}"
+                                                          Style="{StaticResource DLRCheckBox}"
+                                                          HorizontalAlignment="Center"/>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="Template name" Width="*"
+                                                        Binding="{Binding ViewName}"
+                                                        ElementStyle="{StaticResource H4}"/>
+                                    <DataGridTextColumn Header="Type" Width="120"
+                                                        Binding="{Binding ViewType}"
+                                                        ElementStyle="{StaticResource H4}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
                 <!-- Active view options -->
                 <Border Style="{StaticResource CardBorder}"
                         Visibility="{Binding SelectedMethod,

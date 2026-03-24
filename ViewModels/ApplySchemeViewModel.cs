@@ -25,49 +25,35 @@ namespace ColorSchemeAddin.ViewModels
         private readonly Document _doc;
         private readonly MainDashboardViewModel _main;
 
-        // ── Step 1: method selection ───────────────────────────────────────
+        // ── Step 1 ─────────────────────────────────────────────────────────
         [ObservableProperty] private ApplyMethod _selectedMethod = ApplyMethod.ApplyToCurrentView;
         [ObservableProperty] private bool _isOnStep1 = true;
 
-        // ── Step 2: scheme + category ──────────────────────────────────────
+        // ── Step 2 ─────────────────────────────────────────────────────────
         [ObservableProperty] private ObservableCollection<ColorFillScheme> _availableSchemes = new();
         [ObservableProperty] private ColorFillScheme? _selectedScheme;
 
-        // Revit element categories
-        [ObservableProperty] private bool _catWalls;
-        [ObservableProperty] private bool _catFloors;
-        [ObservableProperty] private bool _catCeilings;
-        [ObservableProperty] private bool _catRooms = true;
-        [ObservableProperty] private bool _catAreas;
-
-        // Active/selected view options
+        // Active view options
         [ObservableProperty] private bool _applyTemporary = true;
         [ObservableProperty] private bool _applyPermanent;
+
+        // Selected views
         [ObservableProperty] private bool _removeExistingTemplates;
         [ObservableProperty] private bool _updateExistingTemplates;
         [ObservableProperty] private ObservableCollection<ViewSelectionItem> _selectableViews = new();
 
-        // View template generation options
+        // View templates for "Apply to view templates" option
+        [ObservableProperty] private ObservableCollection<ViewSelectionItem> _selectableTemplates = new();
+
+        // Generate view templates options
         [ObservableProperty] private bool _vtFloorPlan = true;
         [ObservableProperty] private bool _vtAreaPlan;
         [ObservableProperty] private bool _vtThreeD;
         [ObservableProperty] private bool _vtSection;
         [ObservableProperty] private bool _vtUseColorFill = true;
         [ObservableProperty] private bool _vtUseFilters;
-        [ObservableProperty] private ObservableCollection<ApplySchemeRowModel> _batchSchemeRows = new();
 
         [ObservableProperty] private string _lastResult = string.Empty;
-
-        // Step 1 display labels
-        public string MethodDescription => SelectedMethod switch
-        {
-            ApplyMethod.CreateMaterials       => "Creates a solid-color material for each scheme entry, duplicated from a 'Color Scheme' template material if present.",
-            ApplyMethod.ApplyToCurrentView    => "Applies the color scheme to the currently active view. Choose temporary (reverts on close) or permanent.",
-            ApplyMethod.ApplyToSelectedViews  => "Choose specific views from the document to apply the scheme to.",
-            ApplyMethod.ApplyToViewTemplates  => "Apply the color scheme to existing view templates in the document.",
-            ApplyMethod.GenerateViewTemplates => "Create new view templates from this scheme across multiple view types.",
-            _ => string.Empty
-        };
 
         public ApplySchemeViewModel(Document doc, MainDashboardViewModel main)
         {
@@ -75,80 +61,101 @@ namespace ColorSchemeAddin.ViewModels
             _main = main;
         }
 
-        // ── Step 1 commands ────────────────────────────────────────────────
+        // ── Step 1 ─────────────────────────────────────────────────────────
 
         [RelayCommand]
         private void Next()
         {
             RefreshSchemes();
             LoadSelectableViews();
+            LoadSelectableTemplates();
             IsOnStep1 = false;
         }
 
         [RelayCommand]
         private void Back() => IsOnStep1 = true;
 
-        // ── Step 2 commands ────────────────────────────────────────────────
+        // ── Step 2 ─────────────────────────────────────────────────────────
 
         [RelayCommand]
         public void RefreshSchemes()
         {
             AvailableSchemes.Clear();
-            BatchSchemeRows.Clear();
             var service = new ColorFillSchemeService(_doc);
             foreach (var s in service.GetAllSchemes())
-            {
                 AvailableSchemes.Add(s);
-                BatchSchemeRows.Add(new ApplySchemeRowModel { Scheme = s, Name = s.Name });
-            }
             SelectedScheme = AvailableSchemes.FirstOrDefault();
         }
 
         [RelayCommand]
         private void ApplyScheme()
         {
-            if (SelectedScheme == null) { NoSchemeMessage(); return; }
+            if (SelectedScheme == null)
+            {
+                MessageBox.Show("Please select a color scheme.",
+                    "No Scheme", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
 
             try
             {
                 _main.SetStatus("Applying…", true);
+
                 var cfService = new ColorFillSchemeService(_doc);
-                var model     = cfService.ToModel(SelectedScheme);
                 var vtService = new ViewTemplateService(_doc);
+                var model     = cfService.ToModel(SelectedScheme);
 
                 switch (SelectedMethod)
                 {
                     case ApplyMethod.CreateMaterials:
-                        var matSvc = new MaterialService(_doc);
-                        var mats = matSvc.SyncMaterials(model);
-                        LastResult = $"Created/updated {mats.Count} material(s) for '{SelectedScheme.Name}'.";
+                        ExecuteCreateMaterials(model);
                         break;
 
                     case ApplyMethod.ApplyToCurrentView:
-                        ApplyToActiveView(model, vtService);
+                        ExecuteApplyToCurrentView(model, vtService);
                         break;
 
                     case ApplyMethod.ApplyToSelectedViews:
-                        ApplyToSelectedViews(model, vtService);
+                        ExecuteApplyToSelectedViews(model, vtService);
                         break;
 
                     case ApplyMethod.ApplyToViewTemplates:
-                        ApplyToExistingTemplates(model, vtService);
+                        ExecuteApplyToViewTemplates(model, vtService);
                         break;
 
                     case ApplyMethod.GenerateViewTemplates:
-                        GenerateViewTemplates(model);
+                        ExecuteGenerateViewTemplates(model, vtService);
                         break;
                 }
 
                 _main.SetStatus(LastResult);
+
+                // Save metadata so scan picks up the applied categories
+                SchemeMetadataService.SaveMetadata(
+                    _doc, SelectedScheme,
+                    GetModelCategories(model),
+                    model.ParameterName ?? "Department");
             }
-            catch (Exception ex) { ShowError(ex); }
+            catch (Exception ex)
+            {
+                LastResult = $"Error: {ex.Message}";
+                _main.SetStatus("Apply failed");
+                MessageBox.Show(ex.Message, "Apply Error",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
-        // ── Application method implementations ─────────────────────────────
+        // ── Apply implementations ──────────────────────────────────────────
 
-        private void ApplyToActiveView(ColorSchemeModel model, ViewTemplateService vtService)
+        private void ExecuteCreateMaterials(ColorSchemeModel model)
+        {
+            var matSvc = new MaterialService(_doc);
+            var mats   = matSvc.SyncMaterials(model);
+            LastResult = $"Created/updated {mats.Count} material(s) for '{SelectedScheme!.Name}'.";
+        }
+
+        private void ExecuteApplyToCurrentView(ColorSchemeModel model,
+            ViewTemplateService vtService)
         {
             var activeView = _doc.ActiveView;
             if (activeView == null)
@@ -158,66 +165,77 @@ namespace ColorSchemeAddin.ViewModels
                 return;
             }
 
-            using var tx = new Transaction(_doc, $"Apply Color Scheme to Active View: {model.Name}");
-            tx.Start();
-            var filters = vtService.GetOrCreateFiltersForScheme(model);
-            vtService.ApplyFiltersToView(activeView, model, filters);
-            tx.Commit();
+            // ApplySchemeToView manages its own transactions internally
+            vtService.ApplySchemeToView(activeView, model, SelectedScheme);
 
-            LastResult = $"Applied '{SelectedScheme!.Name}' to '{activeView.Name}'" +
-                         (ApplyTemporary ? " (temporary)." : " (permanent).");
+            LastResult = $"Applied '{SelectedScheme!.Name}' to '{activeView.Name}'.";
         }
 
-        private void ApplyToSelectedViews(ColorSchemeModel model, ViewTemplateService vtService)
+        private void ExecuteApplyToSelectedViews(ColorSchemeModel model,
+            ViewTemplateService vtService)
         {
             var selected = SelectableViews.Where(v => v.IsSelected).ToList();
             if (!selected.Any())
             {
-                MessageBox.Show("Select at least one view.", "No Views Selected",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Select at least one view.",
+                    "No Views Selected", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            using var tx = new Transaction(_doc, $"Apply Color Scheme to Selected Views: {model.Name}");
-            tx.Start();
-            var filters = vtService.GetOrCreateFiltersForScheme(model);
-            foreach (var item in selected)
-            {
-                var view = (View)_doc.GetElement(item.ViewId);
-                if (view != null)
-                    vtService.ApplyFiltersToView(view, model, filters);
-            }
-            tx.Commit();
+            var views = selected
+                .Select(item => _doc.GetElement(item.ViewId) as View)
+                .Where(v => v != null)
+                .Cast<View>()
+                .ToList();
+
+            // ApplySchemeToViews manages its own transactions internally
+            vtService.ApplySchemeToViews(views, model, SelectedScheme);
 
             LastResult = $"Applied '{SelectedScheme!.Name}' to {selected.Count} view(s).";
         }
 
-        private void ApplyToExistingTemplates(ColorSchemeModel model, ViewTemplateService vtService)
+        private void ExecuteApplyToViewTemplates(ColorSchemeModel model,
+            ViewTemplateService vtService)
         {
-            var templates = new FilteredElementCollector(_doc)
-                .OfClass(typeof(View))
-                .Cast<View>()
-                .Where(v => v.IsTemplate)
-                .ToList();
+            // Use selected templates if any are checked, else apply to all
+            var selectedIds = SelectableTemplates
+                .Where(t => t.IsSelected)
+                .Select(t => t.ViewId)
+                .ToHashSet();
+
+            List<View> templates;
+            if (selectedIds.Any())
+            {
+                templates = selectedIds
+                    .Select(id => _doc.GetElement(id) as View)
+                    .Where(v => v != null)
+                    .Cast<View>()
+                    .ToList();
+            }
+            else
+            {
+                templates = new FilteredElementCollector(_doc)
+                    .OfClass(typeof(View))
+                    .Cast<View>()
+                    .Where(v => v.IsTemplate)
+                    .ToList();
+            }
 
             if (!templates.Any())
             {
-                MessageBox.Show("No view templates found in document.", "None Found",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("No view templates found. Select at least one template " +
+                    "or ensure templates exist in the document.",
+                    "None Found", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
-            using var tx = new Transaction(_doc, $"Apply Color Scheme to View Templates: {model.Name}");
-            tx.Start();
-            var filters = vtService.GetOrCreateFiltersForScheme(model);
-            foreach (var t in templates)
-                vtService.ApplyFiltersToView(t, model, filters);
-            tx.Commit();
-
-            LastResult = $"Applied '{SelectedScheme!.Name}' to {templates.Count} view template(s).";
+            // Use ApplySchemeToViews which handles its own transactions correctly
+            vtService.ApplySchemeToViews(templates, model, SelectedScheme);
+            LastResult = $"Applied '{SelectedScheme!.Name}' to {templates.Count} template(s).";
         }
 
-        private void GenerateViewTemplates(ColorSchemeModel model)
+        private void ExecuteGenerateViewTemplates(ColorSchemeModel model,
+            ViewTemplateService vtService)
         {
             var viewTypes = new List<ViewTemplateType>();
             if (VtFloorPlan) viewTypes.Add(ViewTemplateType.FloorPlan);
@@ -227,8 +245,60 @@ namespace ColorSchemeAddin.ViewModels
 
             if (!viewTypes.Any())
             {
-                MessageBox.Show("Select at least one view type.", "No View Types",
-                    MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Select at least one view type.",
+                    "No View Types", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            // Check for missing source views before starting
+            var missing = new List<string>();
+            foreach (var vt in viewTypes)
+            {
+                if (!vtService.HasSourceViewOfType(vt))
+                    missing.Add(vtService.ViewTypeName(vt));
+            }
+
+            if (missing.Any())
+            {
+                // 3D views can be auto-created; plan views need user action
+                var planMissing = missing.Where(m => m != "3D").ToList();
+                var needs3D     = missing.Contains("3D");
+
+                if (planMissing.Any())
+                {
+                    string msg = $"No source view found for: {string.Join(", ", planMissing)}.\n\n" +
+                                 "Please create at least one view of each missing type in Revit, " +
+                                 "then try again.\n\nWould you like to continue with the available view types only?";
+
+                    var result = MessageBox.Show(msg, "Missing Source Views",
+                        MessageBoxButton.YesNo, MessageBoxImage.Warning);
+
+                    if (result == MessageBoxResult.No) return;
+
+                    // Remove the types we can't handle
+                    foreach (var m in planMissing)
+                        viewTypes.RemoveAll(vt => vtService.ViewTypeName(vt) == m);
+                }
+
+                if (needs3D && !planMissing.Any())
+                {
+                    var result = MessageBox.Show(
+                        "No 3D view found in the document.\n\n" +
+                        "Would you like to create a default isometric 3D view to use as " +
+                        "the source for the template?",
+                        "Create 3D View?",
+                        MessageBoxButton.YesNo, MessageBoxImage.Question);
+
+                    if (result == MessageBoxResult.No)
+                        viewTypes.Remove(ViewTemplateType.ThreeD);
+                    // If Yes, CreateViewTemplateOfType will create it automatically
+                }
+            }
+
+            if (!viewTypes.Any())
+            {
+                MessageBox.Show("No view types available to process.",
+                    "Nothing to Do", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -239,14 +309,36 @@ namespace ColorSchemeAddin.ViewModels
                 _             => ColorApplicationMethod.ColorFillScheme
             };
 
-            var vtService = new ViewTemplateService(_doc);
-            var created   = vtService.BatchCreateTemplates(
-                new[] { model }, viewTypes, method);
+            var schemeMap = new Dictionary<string, ColorFillScheme>
+            {
+                { model.Name, SelectedScheme! }
+            };
+
+            var created = vtService.BatchCreateTemplates(
+                new[] { model }, viewTypes, method, schemeMap);
 
             LastResult = $"Created {created.Count} view template(s) for '{model.Name}'.";
         }
 
         // ── Helpers ────────────────────────────────────────────────────────
+
+        private void LoadSelectableTemplates()
+        {
+            SelectableTemplates.Clear();
+            var templates = new FilteredElementCollector(_doc)
+                .OfClass(typeof(View))
+                .Cast<View>()
+                .Where(v => v.IsTemplate)
+                .OrderBy(v => v.Name);
+
+            foreach (var v in templates)
+                SelectableTemplates.Add(new ViewSelectionItem
+                {
+                    ViewId   = v.Id,
+                    ViewName = v.Name,
+                    ViewType = v.ViewType.ToString()
+                });
+        }
 
         private void LoadSelectableViews()
         {
@@ -269,23 +361,16 @@ namespace ColorSchemeAddin.ViewModels
                 });
         }
 
-        private void NoSchemeMessage() =>
-            MessageBox.Show("Please select a color scheme.",
-                "No Scheme Selected", MessageBoxButton.OK, MessageBoxImage.Information);
-
-        private void ShowError(Exception ex)
+        private static IEnumerable<BuiltInCategory> GetModelCategories(ColorSchemeModel model)
         {
-            LastResult = $"Error: {ex.Message}";
-            _main.SetStatus("Operation failed");
-            MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            var list = new List<BuiltInCategory>();
+            if (model.ApplyToRooms)         list.Add(BuiltInCategory.OST_Rooms);
+            if (model.ApplyToAreas)         list.Add(BuiltInCategory.OST_Areas);
+            if (model.ApplyToFloors)        list.Add(BuiltInCategory.OST_Floors);
+            if (model.ApplyToGenericModels) list.Add(BuiltInCategory.OST_GenericModel);
+            if (model.ApplyToMasses)        list.Add(BuiltInCategory.OST_Mass);
+            return list;
         }
-    }
-
-    public partial class ApplySchemeRowModel : ObservableObject
-    {
-        [ObservableProperty] private bool _isSelected;
-        public ColorFillScheme Scheme { get; set; } = null!;
-        public string Name { get; set; } = string.Empty;
     }
 
     public partial class ViewSelectionItem : ObservableObject

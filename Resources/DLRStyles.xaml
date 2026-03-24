@@ -339,6 +339,15 @@
     </Style>
 
     <Style x:Key="DLRDataGridColumnHeader" TargetType="DataGridColumnHeader">
+        <Setter Property="ContentTemplate">
+            <Setter.Value>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </DataTemplate>
+            </Setter.Value>
+        </Setter>
         <Setter Property="Background"  Value="{StaticResource ElevatedBrush}"/>
         <Setter Property="Foreground"  Value="{StaticResource TextSecondaryBrush}"/>
         <Setter Property="FontFamily"  Value="{StaticResource BodyFont}"/>
@@ -500,5 +509,6 @@
     <views:IntEqualConverter                x:Key="IntEqualConverter"/>
     <views:BoolToCheckmarkConverter         x:Key="BoolToCheckmark"/>
     <views:EnumEqualConverter               x:Key="EnumEqualConverter"/>
+    <views:InverseBoolConverter             x:Key="InverseBool"/>
 
 </ResourceDictionary>

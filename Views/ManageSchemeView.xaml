@@ -18,8 +18,14 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="Color Schemes"
-                       Style="{StaticResource H2}" VerticalAlignment="Center"/>
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Color Schemes" Style="{StaticResource H2}"/>
+                <TextBlock Text=" — scanning…"
+                           Style="{StaticResource MutedText}"
+                           VerticalAlignment="Center" Margin="8,0,0,0"
+                           Visibility="{Binding IsScanning,
+                               Converter={StaticResource BoolToVisibility}}"/>
+            </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal">
                 <Button Content="⟳  Refresh" Margin="0,0,8,0"
                         Style="{StaticResource SecondaryButton}"
@@ -41,9 +47,11 @@
             <DataGrid Style="{StaticResource DLRDataGrid}"
                       ItemsSource="{Binding SchemeRows}"
                       SelectedItem="{Binding SelectedRow}"
-                      ColumnHeaderStyle="{StaticResource DLRDataGridColumnHeader}">
+                      ColumnHeaderStyle="{StaticResource DLRDataGridColumnHeader}"
+                      EnableColumnVirtualization="False">
                 <DataGrid.Columns>
 
+                    <!-- Checkbox -->
                     <DataGridTemplateColumn Width="36" CanUserResize="False">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
@@ -55,7 +63,7 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <!-- Scheme name clickable link -->
+                    <!-- Scheme name -->
                     <DataGridTemplateColumn Header="Scheme name" Width="*" MinWidth="140">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
@@ -79,90 +87,172 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="Models" Width="58">
+                    <!-- Models -->
+                    <DataGridTemplateColumn Header="Gen.
+Models" Width="76">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding HasGenericModels,
+                                <TextBlock HorizontalAlignment="Center"
+                                           Style="{StaticResource H4}"
+                                           Text="{Binding HasGenericModels,
                                                Converter={StaticResource BoolToCheckmark}}"
-                                           HorizontalAlignment="Center"
-                                           Style="{StaticResource H4}"/>
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="Rooms" Width="56">
+                    <!-- Rooms — green if applied -->
+                    <DataGridTemplateColumn Header="Rooms" Width="60">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding HasRooms,
-                                               Converter={StaticResource BoolToCheckmark}}"
-                                           HorizontalAlignment="Center"
-                                           Style="{StaticResource H4}"/>
+                                <TextBlock HorizontalAlignment="Center"
+                                           Text="{Binding HasRooms,
+                                               Converter={StaticResource BoolToCheckmark}}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock"
+                                               BasedOn="{StaticResource H4}">
+                                            <Setter Property="Foreground"
+                                                    Value="{StaticResource TextSecondaryBrush}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsRoomsApplied}"
+                                                             Value="True">
+                                                    <Setter Property="Foreground"
+                                                            Value="#FF2D9E4A"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="Areas" Width="56">
+                    <!-- Areas — green if applied -->
+                    <DataGridTemplateColumn Header="Areas" Width="60">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding HasAreas,
-                                               Converter={StaticResource BoolToCheckmark}}"
-                                           HorizontalAlignment="Center"
-                                           Style="{StaticResource H4}"/>
+                                <TextBlock HorizontalAlignment="Center"
+                                           Text="{Binding HasAreas,
+                                               Converter={StaticResource BoolToCheckmark}}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock"
+                                               BasedOn="{StaticResource H4}">
+                                            <Setter Property="Foreground"
+                                                    Value="{StaticResource TextSecondaryBrush}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsAreasApplied}"
+                                                             Value="True">
+                                                    <Setter Property="Foreground"
+                                                            Value="#FF2D9E4A"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="Floors" Width="56">
+                    <!-- Floors -->
+                    <DataGridTemplateColumn Header="Floors" Width="60">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding HasFloors,
+                                <TextBlock HorizontalAlignment="Center"
+                                           Style="{StaticResource H4}"
+                                           Text="{Binding HasFloors,
                                                Converter={StaticResource BoolToCheckmark}}"
-                                           HorizontalAlignment="Center"
-                                           Style="{StaticResource H4}"/>
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="Materials" Width="72">
+                    <!-- Materials -->
+                    <DataGridTemplateColumn Header="Materials" Width="90">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding HasMaterials,
+                                <TextBlock HorizontalAlignment="Center"
+                                           Style="{StaticResource H4}"
+                                           Text="{Binding HasMaterials,
                                                Converter={StaticResource BoolToCheckmark}}"
-                                           HorizontalAlignment="Center"
-                                           Style="{StaticResource H4}"/>
+                                           Foreground="{StaticResource TextSecondaryBrush}"/>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
+                    <!-- 3D — green if applied -->
                     <DataGridTemplateColumn Header="3D" Width="44">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding Has3D,
-                                               Converter={StaticResource BoolToCheckmark}}"
-                                           HorizontalAlignment="Center"
-                                           Style="{StaticResource H4}"/>
+                                <TextBlock HorizontalAlignment="Center"
+                                           Text="{Binding Has3D,
+                                               Converter={StaticResource BoolToCheckmark}}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock"
+                                               BasedOn="{StaticResource H4}">
+                                            <Setter Property="Foreground"
+                                                    Value="{StaticResource TextSecondaryBrush}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Is3DApplied}"
+                                                             Value="True">
+                                                    <Setter Property="Foreground"
+                                                            Value="#FF2D9E4A"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="Floor Plan" Width="78">
+                    <!-- Floor Plan — green if applied -->
+                    <DataGridTemplateColumn Header="Floor&#10;Plan" Width="82">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding HasFloorPlan,
-                                               Converter={StaticResource BoolToCheckmark}}"
-                                           HorizontalAlignment="Center"
-                                           Style="{StaticResource H4}"/>
+                                <TextBlock HorizontalAlignment="Center"
+                                           Text="{Binding HasFloorPlan,
+                                               Converter={StaticResource BoolToCheckmark}}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock"
+                                               BasedOn="{StaticResource H4}">
+                                            <Setter Property="Foreground"
+                                                    Value="{StaticResource TextSecondaryBrush}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsFloorPlanApplied}"
+                                                             Value="True">
+                                                    <Setter Property="Foreground"
+                                                            Value="#FF2D9E4A"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
-                    <DataGridTemplateColumn Header="Area Plan" Width="76">
+                    <!-- Area Plan — green if applied -->
+                    <DataGridTemplateColumn Header="Area&#10;Plan" Width="80">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding HasAreaPlan,
-                                               Converter={StaticResource BoolToCheckmark}}"
-                                           HorizontalAlignment="Center"
-                                           Style="{StaticResource H4}"/>
+                                <TextBlock HorizontalAlignment="Center"
+                                           Text="{Binding HasAreaPlan,
+                                               Converter={StaticResource BoolToCheckmark}}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock"
+                                               BasedOn="{StaticResource H4}">
+                                            <Setter Property="Foreground"
+                                                    Value="{StaticResource TextSecondaryBrush}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsAreaPlanApplied}"
+                                                             Value="True">
+                                                    <Setter Property="Foreground"
+                                                            Value="#FF2D9E4A"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                             </DataTemplate>
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
@@ -176,11 +266,15 @@
                                     <Border.Style>
                                         <Style TargetType="Border">
                                             <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsApplied}" Value="True">
-                                                    <Setter Property="Background" Value="#1A2D7A3A"/>
+                                                <DataTrigger Binding="{Binding IsApplied}"
+                                                             Value="True">
+                                                    <Setter Property="Background"
+                                                            Value="#1A2D9E4A"/>
                                                 </DataTrigger>
-                                                <DataTrigger Binding="{Binding IsApplied}" Value="False">
-                                                    <Setter Property="Background" Value="#22FFFFFF"/>
+                                                <DataTrigger Binding="{Binding IsApplied}"
+                                                             Value="False">
+                                                    <Setter Property="Background"
+                                                            Value="#22FFFFFF"/>
                                                 </DataTrigger>
                                             </Style.Triggers>
                                         </Style>
@@ -189,13 +283,18 @@
                                         <TextBlock.Style>
                                             <Style TargetType="TextBlock">
                                                 <Style.Triggers>
-                                                    <DataTrigger Binding="{Binding IsApplied}" Value="True">
-                                                        <Setter Property="Text"       Value="Applied"/>
-                                                        <Setter Property="Foreground" Value="#2D7A3A"/>
+                                                    <DataTrigger Binding="{Binding IsApplied}"
+                                                                 Value="True">
+                                                        <Setter Property="Text" Value="Applied"/>
+                                                        <Setter Property="Foreground"
+                                                                Value="#FF2D9E4A"/>
                                                     </DataTrigger>
-                                                    <DataTrigger Binding="{Binding IsApplied}" Value="False">
-                                                        <Setter Property="Text"       Value="Not applied"/>
-                                                        <Setter Property="Foreground" Value="{StaticResource TextSecondaryBrush}"/>
+                                                    <DataTrigger Binding="{Binding IsApplied}"
+                                                                 Value="False">
+                                                        <Setter Property="Text"
+                                                                Value="Not applied"/>
+                                                        <Setter Property="Foreground"
+                                                                Value="{StaticResource TextSecondaryBrush}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
                                             </Style>
@@ -206,6 +305,7 @@
                         </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
 
+                    <!-- Edit button -->
                     <DataGridTemplateColumn Header="" Width="60">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>

@@ -15,6 +15,10 @@ namespace ColorSchemeAddin.Models
         private string _parameterName = string.Empty;
         private bool _applyToRooms;
         private bool _applyToAreas;
+        private bool _applyToFloors;
+        private bool _applyToGenericModels;
+        private bool _applyToMasses;
+
         private bool _applyMaterials;
         private bool _applyViewFilters;
         private bool _applyViewTemplates;
@@ -52,6 +56,24 @@ namespace ColorSchemeAddin.Models
         {
             get => _applyToAreas;
             set { _applyToAreas = value; OnPropertyChanged(); }
+        }
+
+        public bool ApplyToFloors
+        {
+            get => _applyToFloors;
+            set { _applyToFloors = value; OnPropertyChanged(); }
+        }
+
+        public bool ApplyToGenericModels
+        {
+            get => _applyToGenericModels;
+            set { _applyToGenericModels = value; OnPropertyChanged(); }
+        }
+
+        public bool ApplyToMasses
+        {
+            get => _applyToMasses;
+            set { _applyToMasses = value; OnPropertyChanged(); }
         }
 
         public bool ApplyMaterials

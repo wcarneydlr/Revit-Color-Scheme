@@ -120,5 +120,14 @@ namespace ColorSchemeAddin.Views
             return System.Windows.Data.Binding.DoNothing;
         }
     }
+    /// <summary>true -> false, false -> true (bool inversion)</summary>
+    public class InverseBoolConverter : IValueConverter
+    {
+        public static readonly InverseBoolConverter Instance = new();
+        public object Convert(object value, Type t, object p, CultureInfo c)
+            => value is bool b ? (object)!b : false;
+        public object ConvertBack(object value, Type t, object p, CultureInfo c)
+            => value is bool b ? (object)!b : false;
+    }
 
 }

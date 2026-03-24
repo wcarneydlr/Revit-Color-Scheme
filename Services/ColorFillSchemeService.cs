@@ -39,7 +39,24 @@ namespace ColorSchemeAddin.Services
 
         public ColorSchemeModel ToModel(ColorFillScheme scheme)
         {
-            var model = new ColorSchemeModel { Name = scheme.Name };
+            // Load metadata from extensible storage (saved by addin on create/edit)
+            var (storedCats, storedParam) = SchemeMetadataService.LoadMetadata(scheme);
+
+            var model = new ColorSchemeModel
+            {
+                Name          = scheme.Name,
+                ParameterName = storedParam,
+                // Seed from extensible storage if available, else fall back to CategoryId
+                ApplyToRooms  = storedCats.Count > 0
+                    ? storedCats.Contains(BuiltInCategory.OST_Rooms)
+                    : scheme.CategoryId == new ElementId(BuiltInCategory.OST_Rooms),
+                ApplyToAreas  = storedCats.Count > 0
+                    ? storedCats.Contains(BuiltInCategory.OST_Areas)
+                    : scheme.CategoryId == new ElementId(BuiltInCategory.OST_Areas),
+                ApplyToFloors        = storedCats.Contains(BuiltInCategory.OST_Floors),
+                ApplyToGenericModels = storedCats.Contains(BuiltInCategory.OST_GenericModel),
+                ApplyToMasses        = storedCats.Contains(BuiltInCategory.OST_Mass),
+            };
             foreach (ColorFillSchemeEntry entry in scheme.GetEntries())
             {
                 model.Entries.Add(new ColorEntryModel
@@ -192,6 +209,114 @@ namespace ColorSchemeAddin.Services
                     modelEntry.IsMapped = false;
                 }
             }
+        }
+
+        /// <summary>
+        /// Creates or updates a ColorFillScheme for OST_Areas linked to the given
+        /// AreaScheme, populating it with entries from the model.
+        /// This makes the color scheme appear in Revit's area plan color fill dialog.
+        /// </summary>
+        public void EnsureAreaColorFillScheme(ColorSchemeModel model, AreaScheme areaScheme)
+        {
+            // Look for existing scheme: same name, OST_Areas, same AreaSchemeId
+            var areaSchemeId    = new ElementId(BuiltInCategory.OST_Areas);
+            var existingSchemes = new FilteredElementCollector(_doc)
+                .OfClass(typeof(ColorFillScheme))
+                .Cast<ColorFillScheme>()
+                .Where(s => s.CategoryId == areaSchemeId &&
+                            s.AreaSchemeId == areaScheme.Id)
+                .ToList();
+
+            // Find one with matching name or use the first one
+            var existing = existingSchemes
+                .FirstOrDefault(s => string.Equals(s.Name, model.Name,
+                    StringComparison.OrdinalIgnoreCase))
+                ?? existingSchemes.FirstOrDefault();
+
+            using var tx = new Transaction(_doc,
+                $"DLR — Create Area Color Fill Scheme: {model.Name}");
+            tx.Start();
+
+            ColorFillScheme targetScheme;
+
+            if (existing != null)
+            {
+                targetScheme = existing;
+                // Rename if needed
+                if (!string.Equals(existing.Name, model.Name,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    try { existing.Name = model.Name; } catch { }
+                }
+            }
+            else
+            {
+                // Duplicate from the first available scheme for this area scheme
+                // (Revit requires duplication — cannot create from scratch)
+                if (existingSchemes.Count == 0)
+                {
+                    // Find any OST_Areas scheme to duplicate from
+                    var anyAreaScheme = new FilteredElementCollector(_doc)
+                        .OfClass(typeof(ColorFillScheme))
+                        .Cast<ColorFillScheme>()
+                        .FirstOrDefault(s => s.CategoryId == areaSchemeId);
+
+                    if (anyAreaScheme == null)
+                    {
+                        tx.RollBack();
+                        return; // No source to duplicate from
+                    }
+
+                    var newId = anyAreaScheme.Duplicate(model.Name);
+                    targetScheme = (ColorFillScheme)_doc.GetElement(newId);
+                }
+                else
+                {
+                    var newId = existingSchemes.First().Duplicate(model.Name);
+                    targetScheme = (ColorFillScheme)_doc.GetElement(newId);
+                }
+            }
+
+            // Clear existing entries and repopulate from model
+            try
+            {
+                var entries = targetScheme.GetEntries().ToList();
+                foreach (var entry in entries)
+                {
+                    try { targetScheme.RemoveEntry(entry); } catch { }
+                }
+            }
+            catch { }
+
+            // Add entries from model
+            foreach (var modelEntry in model.Entries)
+            {
+                try
+                {
+                    var entry = new ColorFillSchemeEntry(StorageType.String);
+                    entry.SetStringValue(modelEntry.Value);
+                    entry.Color = new Color(modelEntry.R, modelEntry.G, modelEntry.B);
+                    entry.Caption = modelEntry.Value;
+                    entry.FillPatternId = GetSolidFillPatternId();
+                    targetScheme.AddEntry(entry);
+                }
+                catch { }
+            }
+
+            tx.Commit();
+        }
+
+        private ElementId GetSolidFillPatternId()
+        {
+            try
+            {
+                var fp = new FilteredElementCollector(_doc)
+                    .OfClass(typeof(FillPatternElement))
+                    .Cast<FillPatternElement>()
+                    .FirstOrDefault(f => f.GetFillPattern().IsSolidFill);
+                return fp?.Id ?? ElementId.InvalidElementId;
+            }
+            catch { return ElementId.InvalidElementId; }
         }
     }
 }

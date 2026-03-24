@@ -53,7 +53,7 @@
                            Fill="#44FFFFFF" Margin="16,0"/>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal">
-                    <Button Content="Create"
+                    <Button x:Name="BtnCreate" Content="Create"
                             Click="NavCreate_Click"
                             Height="56" Padding="20,0"
                             Background="Transparent"
@@ -61,7 +61,7 @@
                             Foreground="#FFB0B8C4"
                             FontSize="14"
                             Cursor="Hand"/>
-                    <Button Content="Manage"
+                    <Button x:Name="BtnManage" Content="Manage"
                             Click="NavManage_Click"
                             Height="56" Padding="20,0"
                             Background="Transparent"
@@ -69,7 +69,7 @@
                             Foreground="#FFB0B8C4"
                             FontSize="14"
                             Cursor="Hand"/>
-                    <Button Content="Apply"
+                    <Button x:Name="BtnApply" Content="Apply"
                             Click="NavApply_Click"
                             Height="56" Padding="20,0"
                             Background="Transparent"

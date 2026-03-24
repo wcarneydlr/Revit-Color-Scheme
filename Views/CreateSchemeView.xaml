@@ -6,75 +6,140 @@
         <ResourceDictionary Source="../Resources/DLRStyles.xaml"/>
     </UserControl.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-        <StackPanel Margin="36,24,36,24" MaxWidth="860">
+    <Grid>
+        <!-- ── Main form (non-scrolling outer, scrolling entry list only) ── -->
+        <Grid Visibility="{Binding ShowCreateOptions,
+                  Converter={StaticResource InverseBoolToVisibility}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>  <!-- method selector -->
+                <RowDefinition Height="Auto"/>  <!-- upload card OR scratch header+name -->
+                <RowDefinition Height="*"/>     <!-- entry list (scrolls) -->
+                <RowDefinition Height="Auto"/>  <!-- add entry + create buttons (fixed) -->
+                <RowDefinition Height="Auto"/>  <!-- status -->
+            </Grid.RowDefinitions>
 
-            <!-- Card 1: Upload Excel -->
-            <Border Style="{StaticResource CardBorder}">
+            <!-- Method selector -->
+            <Border Grid.Row="0" Style="{StaticResource CardBorder}" Margin="36,24,36,8">
                 <StackPanel>
-                    <TextBlock Text="Upload Excel" Style="{StaticResource H2}"/>
-                    <TextBlock Style="{StaticResource MutedText}" Margin="0,4,0,14"
-                               Text="Import a populated template to create one or more schemes. Each sheet becomes a separate scheme."/>
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBox Grid.Column="0" Margin="0,0,8,0"
-                                 Style="{StaticResource DLRTextBox}"
-                                 Text="{Binding ImportFilePath, Mode=OneWay}"
-                                 IsReadOnly="True"/>
-                        <Button Grid.Column="1" Content="Browse…" Margin="0,0,8,0"
-                                Style="{StaticResource SecondaryButton}"
-                                Command="{Binding BrowseImportFileCommand}"/>
-                        <Button Grid.Column="2" Content="Download template"
-                                Style="{StaticResource SecondaryButton}"
-                                Command="{Binding DownloadTemplateCommand}"/>
-                    </Grid>
-                    <ListBox ItemsSource="{Binding ImportedSchemes}"
-                             SelectedItem="{Binding SelectedImportedScheme}"
-                             Background="#1AFFFFFF" BorderThickness="0" MaxHeight="110"
-                             Visibility="{Binding ImportedSchemes.Count,
-                                 Converter={StaticResource ZeroToCollapsed}}">
-                        <ListBox.ItemTemplate>
-                            <DataTemplate>
-                                <StackPanel Orientation="Horizontal" Margin="8,3">
-                                    <TextBlock Text="{Binding Name}"
-                                               Style="{StaticResource H4Bold}"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock Style="{StaticResource MutedText}"
-                                               VerticalAlignment="Center" Margin="8,0,0,0">
-                                        <Run Text="{Binding Entries.Count, Mode=OneWay}"/>
-                                        <Run Text=" entries"/>
-                                    </TextBlock>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                    <Button Content="Upload and Create"
-                            Style="{StaticResource PrimaryButton}"
-                            HorizontalAlignment="Left" MinWidth="180"
-                            Margin="0,12,0,0"
-                            Command="{Binding CreateFromImportCommand}"/>
+                    <TextBlock Text="Create a color scheme"
+                               Style="{StaticResource H2}" Margin="0,0,0,16"/>
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton Style="{StaticResource DLRRadioButton}"
+                                     Content="Upload Excel"
+                                     GroupName="CreateMethod"
+                                     IsChecked="{Binding IsUploadMethod}"
+                                     Margin="0,0,24,0"/>
+                        <RadioButton Style="{StaticResource DLRRadioButton}"
+                                     Content="Create from scratch"
+                                     GroupName="CreateMethod"
+                                     IsChecked="{Binding IsScratchMethod}"/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
-            <!-- Card 2: Create from scratch -->
-            <Border Style="{StaticResource CardBorder}">
+            <!-- ── Upload Excel (replaces rows 2-4 when active) ─────────── -->
+            <Grid Grid.Row="1" Grid.RowSpan="3"
+                  Visibility="{Binding IsUploadMethod,
+                      Converter={StaticResource BoolToVisibility}}">
+                <Border Style="{StaticResource CardBorder}" Margin="36,0,36,8">
+                    <StackPanel>
+                        <TextBlock Text="Upload Excel" Style="{StaticResource H3}"
+                                   Margin="0,0,0,4"/>
+                        <TextBlock Style="{StaticResource MutedText}" Margin="0,0,0,14"
+                                   Text="Import a populated template. Each sheet becomes a separate scheme."/>
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" Margin="0,0,8,0"
+                                     Height="32" Padding="10,5"
+                                     VerticalContentAlignment="Center"
+                                     Background="{StaticResource InputBgBrush}"
+                                     Foreground="#FF1B222C"
+                                     BorderBrush="{StaticResource BorderBrush}"
+                                     BorderThickness="1"
+                                     Text="{Binding ImportFilePath, Mode=OneWay}"
+                                     IsReadOnly="True"/>
+                            <Button Grid.Column="1" Content="Browse…" Margin="0,0,8,0"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding BrowseImportFileCommand}"/>
+                            <Button Grid.Column="2" Content="Download template"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding DownloadTemplateCommand}"/>
+                        </Grid>
+                        <ListBox ItemsSource="{Binding ImportedSchemes}"
+                                 SelectedItem="{Binding SelectedImportedScheme}"
+                                 Background="#1AFFFFFF" BorderThickness="0" MaxHeight="100"
+                                 Visibility="{Binding ImportedSchemes.Count,
+                                     Converter={StaticResource ZeroToCollapsed}}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Orientation="Horizontal" Margin="8,3">
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontSize="14" FontWeight="SemiBold"
+                                                   Foreground="White" VerticalAlignment="Center"/>
+                                        <TextBlock Foreground="{StaticResource TextSecondaryBrush}"
+                                                   FontSize="12" VerticalAlignment="Center"
+                                                   Margin="8,0,0,0">
+                                            <Run Text="{Binding Entries.Count, Mode=OneWay}"/>
+                                            <Run Text=" entries"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <Grid Margin="0,12,0,0">
+                            <Button Content="Upload and Create →"
+                                    Style="{StaticResource PrimaryButton}"
+                                    HorizontalAlignment="Right" MinWidth="180"
+                                    Command="{Binding ShowUploadOptionsCommand}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- ── Create from scratch ───────────────────────────────────── -->
+            <!-- Header + scheme name (fixed, doesn't scroll) -->
+            <Border Grid.Row="1" Margin="36,0,36,0" Padding="24,16,24,8"
+                    Background="{StaticResource SurfaceBrush}"
+                    CornerRadius="8,8,0,0"
+                    Visibility="{Binding IsScratchMethod,
+                        Converter={StaticResource BoolToVisibility}}">
                 <StackPanel>
-                    <TextBlock Text="Create from scratch" Style="{StaticResource H2}"/>
-                    <TextBlock Style="{StaticResource MutedText}" Margin="0,4,0,14"
-                               Text="Start with a blank scheme and define your colors and values manually."/>
-                    <TextBlock Text="Scheme name" Style="{StaticResource H5}" Margin="0,0,0,6"/>
-                    <TextBox Style="{StaticResource DLRTextBox}" Margin="0,0,0,12"
+                    <TextBlock Text="Create from scratch" Style="{StaticResource H3}"
+                               Margin="0,0,0,4"/>
+                    <TextBlock Style="{StaticResource MutedText}" Margin="0,0,0,12"
+                               Text="Define your scheme name then add color entries manually."/>
+                    <TextBlock Text="Scheme name" Style="{StaticResource H5}"
+                               Margin="0,0,0,6"/>
+                    <TextBox Height="32" Padding="10,5"
+                             VerticalContentAlignment="Center"
+                             Background="{StaticResource InputBgBrush}"
+                             Foreground="#FF1B222C"
+                             BorderBrush="{StaticResource BorderBrush}"
+                             BorderThickness="1"
                              Text="{Binding ScratchSchemeName,
                                  UpdateSourceTrigger=PropertyChanged}"/>
+                </StackPanel>
+            </Border>
 
-                    <!-- Entry list header -->
-                    <Grid Margin="0,0,0,4">
+            <!-- Entry list — this row ONLY scrolls -->
+            <Border Grid.Row="2" Margin="36,0,36,0"
+                    Background="{StaticResource SurfaceBrush}"
+                    Visibility="{Binding IsScratchMethod,
+                        Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/> <!-- column headers -->
+                        <RowDefinition Height="*"/>    <!-- scrolling entries -->
+                    </Grid.RowDefinitions>
+
+                    <!-- Column headers (fixed) -->
+                    <Grid Grid.Row="0" Margin="16,8,16,4">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="24"/>
+                            <ColumnDefinition Width="28"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="70"/>
                             <ColumnDefinition Width="70"/>
@@ -91,127 +156,242 @@
                                    Style="{StaticResource H5}" HorizontalAlignment="Center"/>
                     </Grid>
 
-                    <!-- Entry rows -->
-                    <ItemsControl ItemsSource="{Binding ScratchScheme.Entries}" MaxHeight="220">
-                        <ItemsControl.Template>
-                            <ControlTemplate>
-                                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                                    <ItemsPresenter/>
-                                </ScrollViewer>
-                            </ControlTemplate>
-                        </ItemsControl.Template>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Grid Margin="0,2">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="24"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="70"/>
-                                        <ColumnDefinition Width="70"/>
-                                        <ColumnDefinition Width="70"/>
-                                        <ColumnDefinition Width="36"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Border Grid.Column="0" Style="{StaticResource ColorSwatch}"
-                                            Background="{Binding PreviewBrush}"
-                                            VerticalAlignment="Center"/>
-                                    <TextBox Grid.Column="1" Margin="4,0,6,0"
-                                             Style="{StaticResource DLRTextBox}"
-                                             Text="{Binding Value,
-                                                 UpdateSourceTrigger=PropertyChanged}"/>
-                                    <TextBox Grid.Column="2" Margin="0,0,4,0"
-                                             Style="{StaticResource DLRTextBox}"
-                                             TextAlignment="Center"
-                                             Text="{Binding R,
-                                                 UpdateSourceTrigger=PropertyChanged,
-                                                 Converter={StaticResource ByteClamp}}"/>
-                                    <TextBox Grid.Column="3" Margin="0,0,4,0"
-                                             Style="{StaticResource DLRTextBox}"
-                                             TextAlignment="Center"
-                                             Text="{Binding G,
-                                                 UpdateSourceTrigger=PropertyChanged,
-                                                 Converter={StaticResource ByteClamp}}"/>
-                                    <TextBox Grid.Column="4" Margin="0,0,4,0"
-                                             Style="{StaticResource DLRTextBox}"
-                                             TextAlignment="Center"
-                                             Text="{Binding B,
-                                                 UpdateSourceTrigger=PropertyChanged,
-                                                 Converter={StaticResource ByteClamp}}"/>
-                                    <Button Grid.Column="5" Content="✕"
-                                            Style="{StaticResource IconButton}"
-                                            Padding="0" Width="28"
-                                            Command="{Binding DataContext.RemoveScratchEntryCommand,
-                                                RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                            CommandParameter="{Binding}"/>
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                        <Button Content="+ Add entry" Margin="0,0,8,0"
-                                Style="{StaticResource SecondaryButton}"
-                                Command="{Binding AddScratchEntryCommand}"/>
-                        <Button Content="Create New Scheme"
-                                Style="{StaticResource PrimaryButton}" MinWidth="180"
-                                Command="{Binding CreateFromScratchCommand}"/>
-                    </StackPanel>
-                </StackPanel>
-            </Border>
-
-            <!-- Card 3: From existing Revit scheme -->
-            <Border Style="{StaticResource CardBorder}">
-                <StackPanel>
-                    <TextBlock Text="From existing scheme" Style="{StaticResource H2}"/>
-                    <TextBlock Style="{StaticResource MutedText}" Margin="0,4,0,14"
-                               Text="Select an existing Revit Color Fill scheme to use as a base."/>
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <ComboBox Grid.Column="0" Margin="0,0,8,0"
-                                  Style="{StaticResource DLRComboBox}"
-                                  ItemsSource="{Binding ExistingRevitSchemes}"
-                                  SelectedItem="{Binding SelectedRevitScheme}"
-                                  DisplayMemberPath="Name"/>
-                        <Button Grid.Column="1" Content="Load scheme"
-                                Style="{StaticResource PrimaryButton}"
-                                Command="{Binding ImportFromRevitSchemeCommand}"/>
-                    </Grid>
-                </StackPanel>
-            </Border>
-
-            <!-- Shared settings -->
-            <Border Style="{StaticResource CardBorder}">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="20"/>
-                        <ColumnDefinition Width="*"/>
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Grid.Column="0">
-                        <TextBlock Text="Fill parameter" Style="{StaticResource H5}"
-                                   Margin="0,0,0,6"/>
-                        <ComboBox Style="{StaticResource DLRComboBox}"
-                                  ItemsSource="{Binding AvailableParameters}"
-                                  SelectedItem="{Binding ParameterName}"/>
-                    </StackPanel>
-                    <StackPanel Grid.Column="2">
-                        <TextBlock Text="Apply to" Style="{StaticResource H5}"
-                                   Margin="0,0,0,8"/>
-                        <CheckBox Style="{StaticResource DLRCheckBox}"
-                                  Content="Rooms" IsChecked="{Binding TargetRooms}"/>
-                        <CheckBox Style="{StaticResource DLRCheckBox}"
-                                  Content="Areas" IsChecked="{Binding TargetAreas}"/>
-                    </StackPanel>
+                    <!-- Scrolling entry rows only -->
+                    <ScrollViewer Grid.Row="1"
+                                  VerticalScrollBarVisibility="Auto"
+                                  Margin="0,0,0,0">
+                        <ItemsControl ItemsSource="{Binding ScratchScheme.Entries}"
+                                      Margin="16,0,16,8">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="28"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="70"/>
+                                            <ColumnDefinition Width="70"/>
+                                            <ColumnDefinition Width="70"/>
+                                            <ColumnDefinition Width="36"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" Width="22" Height="22"
+                                                CornerRadius="4"
+                                                Background="{Binding PreviewBrush}"
+                                                BorderThickness="0.5"
+                                                BorderBrush="{StaticResource BorderBrush}"
+                                                VerticalAlignment="Center"
+                                                Cursor="Hand" ToolTip="Click to pick color"
+                                                MouseLeftButtonUp="ColorSwatch_Click"
+                                                Tag="{Binding}"/>
+                                        <TextBox Grid.Column="1" Margin="4,0,6,0"
+                                                 Height="32" Padding="8,5"
+                                                 VerticalContentAlignment="Center"
+                                                 Background="{StaticResource InputBgBrush}"
+                                                 Foreground="#FF1B222C"
+                                                 BorderBrush="{StaticResource BorderBrush}"
+                                                 BorderThickness="1"
+                                                 Text="{Binding Value,
+                                                     UpdateSourceTrigger=PropertyChanged}"/>
+                                        <TextBox Grid.Column="2" Margin="0,0,4,0"
+                                                 Height="32" Padding="4,5"
+                                                 TextAlignment="Center"
+                                                 VerticalContentAlignment="Center"
+                                                 Background="{StaticResource InputBgBrush}"
+                                                 Foreground="#FF1B222C"
+                                                 BorderBrush="{StaticResource BorderBrush}"
+                                                 BorderThickness="1"
+                                                 Text="{Binding R, UpdateSourceTrigger=PropertyChanged,
+                                                     Converter={StaticResource ByteClamp}}"/>
+                                        <TextBox Grid.Column="3" Margin="0,0,4,0"
+                                                 Height="32" Padding="4,5"
+                                                 TextAlignment="Center"
+                                                 VerticalContentAlignment="Center"
+                                                 Background="{StaticResource InputBgBrush}"
+                                                 Foreground="#FF1B222C"
+                                                 BorderBrush="{StaticResource BorderBrush}"
+                                                 BorderThickness="1"
+                                                 Text="{Binding G, UpdateSourceTrigger=PropertyChanged,
+                                                     Converter={StaticResource ByteClamp}}"/>
+                                        <TextBox Grid.Column="4" Margin="0,0,4,0"
+                                                 Height="32" Padding="4,5"
+                                                 TextAlignment="Center"
+                                                 VerticalContentAlignment="Center"
+                                                 Background="{StaticResource InputBgBrush}"
+                                                 Foreground="#FF1B222C"
+                                                 BorderBrush="{StaticResource BorderBrush}"
+                                                 BorderThickness="1"
+                                                 Text="{Binding B, UpdateSourceTrigger=PropertyChanged,
+                                                     Converter={StaticResource ByteClamp}}"/>
+                                        <Button Grid.Column="5" Content="✕"
+                                                Style="{StaticResource IconButton}"
+                                                Padding="0" Width="28"
+                                                Command="{Binding DataContext.RemoveScratchEntryCommand,
+                                                    RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"/>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
                 </Grid>
             </Border>
 
-            <TextBlock Text="{Binding LastResult}"
+            <!-- Fixed bottom bar: Add entry + Create button -->
+            <Border Grid.Row="3" Margin="36,0,36,8" Padding="16,12"
+                    Background="{StaticResource SurfaceBrush}"
+                    CornerRadius="0,0,8,8"
+                    Visibility="{Binding IsScratchMethod,
+                        Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Button Content="+ Add entry"
+                            Style="{StaticResource SecondaryButton}"
+                            HorizontalAlignment="Left"
+                            Command="{Binding AddScratchEntryCommand}"/>
+                    <Button Content="Create New Scheme →"
+                            Style="{StaticResource PrimaryButton}"
+                            HorizontalAlignment="Right" MinWidth="180"
+                            Command="{Binding ShowScratchOptionsCommand}"/>
+                </Grid>
+            </Border>
+
+            <!-- Status -->
+            <TextBlock Grid.Row="4"
+                       Text="{Binding LastResult}"
                        Style="{StaticResource MutedText}"
-                       Margin="0,0,0,24"
+                       Margin="36,4,36,12"
                        Visibility="{Binding LastResult,
                            Converter={StaticResource NullToCollapsed}}"/>
-        </StackPanel>
-    </ScrollViewer>
+        </Grid>
+
+        <!-- ── Create Options panel ──────────────────────────────────────── -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      Visibility="{Binding ShowCreateOptions,
+                          Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Margin="36,24,36,24" MaxWidth="860">
+                <Border Style="{StaticResource CardBorder}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                            <TextBlock Text="Create Options"
+                                       Style="{StaticResource H2}" VerticalAlignment="Center"/>
+                            <TextBlock Text=" — configure how this scheme will be applied"
+                                       Style="{StaticResource MutedText}"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Fill parameter -->
+                        <TextBlock Text="Fill parameter" Style="{StaticResource H5}"
+                                   Margin="0,0,0,6"/>
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox Grid.Column="0" Margin="0,0,8,0"
+                                      Style="{StaticResource DLRComboBox}"
+                                      ItemsSource="{Binding AvailableParameters}"
+                                      SelectedItem="{Binding ParameterName}"/>
+                            <Button Grid.Column="1" Content="+ New parameter"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding RevealNewParameterInputCommand}"
+                                    Visibility="{Binding ShowParamInput,
+                                        Converter={StaticResource InverseBoolToVisibility}}"/>
+                        </Grid>
+
+                        <!-- Inline new parameter creator -->
+                        <Border Background="#1AFFFFFF" CornerRadius="6"
+                                Padding="12" Margin="0,0,0,16"
+                                Visibility="{Binding ShowParamInput,
+                                    Converter={StaticResource BoolToVisibility}}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0" Margin="0,0,8,0"
+                                         Height="32" Padding="10,5"
+                                         VerticalContentAlignment="Center"
+                                         Background="{StaticResource InputBgBrush}"
+                                         Foreground="#FF1B222C"
+                                         BorderBrush="{StaticResource BorderBrush}"
+                                         BorderThickness="1"
+                                         Text="{Binding NewParameterName,
+                                             UpdateSourceTrigger=PropertyChanged}"/>
+                                <Button Grid.Column="1" Content="Create"
+                                        Style="{StaticResource PrimaryButton}"
+                                        Margin="0,0,8,0" MinWidth="80"
+                                        Command="{Binding CreateNewParameterCommand}"/>
+                                <Button Grid.Column="2" Content="Cancel"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Command="{Binding CancelNewParameterCommand}"/>
+                            </Grid>
+                        </Border>
+
+                        <!-- Applies to -->
+                        <TextBlock Text="Applies to" Style="{StaticResource H5}"
+                                   Margin="0,8,0,8"/>
+                        <WrapPanel Margin="0,0,0,8">
+                            <CheckBox Style="{StaticResource DLRCheckBox}"
+                                      Content="Rooms" Margin="0,0,24,6"
+                                      IsChecked="{Binding ApplyRooms}"/>
+                            <CheckBox Style="{StaticResource DLRCheckBox}"
+                                      Content="Areas" Margin="0,0,24,6"
+                                      IsChecked="{Binding ApplyAreas}"/>
+                            <CheckBox Style="{StaticResource DLRCheckBox}"
+                                      Content="Masses" Margin="0,0,24,6"
+                                      IsChecked="{Binding ApplyMasses}"/>
+                            <CheckBox Style="{StaticResource DLRCheckBox}"
+                                      Content="Generic Models" Margin="0,0,24,6"
+                                      IsChecked="{Binding ApplyGenericModels}"/>
+                            <CheckBox Style="{StaticResource DLRCheckBox}"
+                                      Content="Floors" Margin="0,0,24,6"
+                                      IsChecked="{Binding ApplyFloors}"/>
+                        </WrapPanel>
+
+                        <!-- Area scheme picker -->
+                        <Border Background="#1AFFFFFF" CornerRadius="6"
+                                Padding="16" Margin="0,0,0,16"
+                                Visibility="{Binding ApplyAreas,
+                                    Converter={StaticResource BoolToVisibility}}">
+                            <StackPanel>
+                                <TextBlock Text="Area scheme" Style="{StaticResource H5}"
+                                           Margin="0,0,0,8"/>
+                                <TextBlock Style="{StaticResource MutedText}"
+                                           Margin="0,0,0,10"
+                                           Text="Select an existing area scheme or create/use one named 'Color Schemes'."/>
+                                <RadioButton Style="{StaticResource DLRRadioButton}"
+                                             Content="Use existing area scheme:"
+                                             GroupName="AreaSchemeChoice"
+                                             IsChecked="{Binding CreateNewAreaScheme,
+                                                 Converter={StaticResource InverseBool}}"
+                                             Margin="0,0,0,6"/>
+                                <ComboBox Style="{StaticResource DLRComboBox}"
+                                          Margin="0,0,0,10"
+                                          ItemsSource="{Binding AvailableAreaSchemes}"
+                                          SelectedItem="{Binding SelectedAreaScheme}"
+                                          DisplayMemberPath="Name"
+                                          IsEnabled="{Binding CreateNewAreaScheme,
+                                              Converter={StaticResource InverseBool}}"/>
+                                <RadioButton Style="{StaticResource DLRRadioButton}"
+                                             Content="Create / use 'Color Schemes' area scheme"
+                                             GroupName="AreaSchemeChoice"
+                                             IsChecked="{Binding CreateNewAreaScheme}"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Bottom row -->
+                        <Grid Margin="0,8,0,0">
+                            <Button Content="← Back"
+                                    Style="{StaticResource SecondaryButton}"
+                                    HorizontalAlignment="Left"
+                                    Command="{Binding HideOptionsCommand}"/>
+                            <Button Content="Create Scheme"
+                                    Style="{StaticResource PrimaryButton}"
+                                    HorizontalAlignment="Right" MinWidth="160"
+                                    Command="{Binding CreateSchemeCommand}"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </UserControl>
